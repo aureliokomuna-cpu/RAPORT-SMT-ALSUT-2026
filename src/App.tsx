@@ -12,6 +12,7 @@ import { SpHistoryView } from './components/SpHistoryView';
 
 import { FilterState, SmtRecord, SpRecord, ZoneSummary } from './types';
 import { computeZoneSummaries, parseSmtCsv, parseSpCsv } from './utils/parser';
+import { matchesSmtSearch } from './utils/searchHelper';
 import { DEFAULT_CSV_URL, DEFAULT_SP_CSV_URL, FALLBACK_CSV_DATA, FALLBACK_SP_CSV_DATA } from './data/defaultCsv';
 import { Sparkles, HelpCircle, Layers, ArrowUp, RefreshCw } from 'lucide-react';
 
@@ -108,21 +109,7 @@ export default function App() {
 
     // Enhanced Search query for NIP and Name
     if (filters.searchQuery && filters.searchQuery.trim()) {
-      const q = filters.searchQuery.trim().toLowerCase();
-      const tokens = q.split(/\s+/).filter(Boolean);
-
-      result = result.filter((s) => {
-        const nameLower = s.nama.toLowerCase();
-        const nipLower = s.nip.toLowerCase();
-        const zoneLower = s.zone.toLowerCase();
-
-        // Match all space-separated search tokens for precision
-        return tokens.every((token) => 
-          nameLower.includes(token) || 
-          nipLower.includes(token) || 
-          zoneLower.includes(token)
-        );
-      });
+      result = result.filter((s) => matchesSmtSearch(s, filters.searchQuery));
     }
 
     // Zone filter
@@ -210,6 +197,8 @@ export default function App() {
         isLoading={isLoading}
         lastUpdated={lastUpdated}
         totalCount={smtList.length}
+        smtList={smtList}
+        onSelectSmt={(smt) => setSelectedSmt(smt)}
       />
 
       {/* Main Container */}
@@ -276,6 +265,8 @@ export default function App() {
           <MonthlyDeepDive
             smtList={smtList}
             onSelectSmt={(smt) => setSelectedSmt(smt)}
+            searchQuery={filters.searchQuery}
+            onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
           />
         )}
 
@@ -283,6 +274,8 @@ export default function App() {
           <LeaderboardPodium
             smtList={smtList}
             onSelectSmt={(smt) => setSelectedSmt(smt)}
+            searchQuery={filters.searchQuery}
+            onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
           />
         )}
 
@@ -303,8 +296,10 @@ export default function App() {
 
         {filters.activeView === 'table' && (
           <TableView
-            smtList={filteredSmts}
+            smtList={smtList}
             onSelectSmt={(smt) => setSelectedSmt(smt)}
+            searchQuery={filters.searchQuery}
+            onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
           />
         )}
 

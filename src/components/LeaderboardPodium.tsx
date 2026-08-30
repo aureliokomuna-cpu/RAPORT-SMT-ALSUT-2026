@@ -8,25 +8,38 @@ import {
   TrendingUp, 
   ArrowRight,
   Shield,
-  Star
+  Star,
+  Search
 } from 'lucide-react';
 import { SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct } from '../utils/parser';
+import { matchesSmtSearch } from '../utils/searchHelper';
 
 interface LeaderboardPodiumProps {
   smtList: SmtRecord[];
   onSelectSmt: (smt: SmtRecord) => void;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
 }
 
 export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({
   smtList,
   onSelectSmt,
+  searchQuery = '',
+  onSearchChange,
 }) => {
-  const topSmts = [...smtList].sort((a, b) => b.ytd.salesPct - a.ytd.salesPct);
-  const first = topSmts[0];
-  const second = topSmts[1];
-  const third = topSmts[2];
-  const restOfTop10 = topSmts.slice(3, 15);
+  const sortedAll = [...smtList].sort((a, b) => b.ytd.salesPct - a.ytd.salesPct);
+  const first = sortedAll[0];
+  const second = sortedAll[1];
+  const third = sortedAll[2];
+
+  const matchedSmts = searchQuery.trim()
+    ? sortedAll.filter((s) => matchesSmtSearch(s, searchQuery))
+    : sortedAll;
+
+  const restOfTop10 = searchQuery.trim() 
+    ? matchedSmts 
+    : sortedAll.slice(3, 15);
 
   return (
     <section className="space-y-6">
@@ -191,45 +204,71 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({
 
       {/* Ranks 4 to 15 Leaderboard Table */}
       <div className="bg-white border-3 border-black rounded-3xl p-5 bento-shadow">
-        <h3 className="text-lg sm:text-xl font-black font-display text-black uppercase mb-4">
-          Top 4 - 15 SMT Rank List
-        </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b-2 border-gray-200">
+          <div>
+            <h3 className="text-lg sm:text-xl font-black font-display text-black uppercase">
+              {searchQuery.trim() ? `Hasil Pencarian Leaderboard (${restOfTop10.length} SMT)` : 'Top 4 - 15 SMT Rank List'}
+            </h3>
+            <p className="text-xs font-bold text-gray-500">
+              {searchQuery.trim() 
+                ? `Menampilkan posisi peringkat SMT untuk kata kunci "${searchQuery}"` 
+                : 'Urutan peringkat sales SMT seluruh zona Alsut'}
+            </p>
+          </div>
 
-        <div className="divide-y-2 divide-gray-200">
-          {restOfTop10.map((s) => (
-            <div
-              key={s.id}
-              onClick={() => onSelectSmt(s)}
-              className="py-3 px-3 hover:bg-yellow-50 rounded-2xl transition-colors cursor-pointer flex items-center justify-between gap-3"
-            >
-              <div className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-xl bg-black text-white font-black text-xs flex items-center justify-center">
-                  #{s.ytd.rank}
-                </span>
-                <div>
-                  <h4 className="text-sm sm:text-base font-black font-display text-black">
-                    {s.nama}
-                  </h4>
-                  <span className="text-[11px] font-semibold text-gray-500">
-                    {s.zone} • NIP: {s.nip}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <span className="text-base sm:text-lg font-black font-display text-emerald-600 block leading-none">
-                    {s.ytd.rawSales}
-                  </span>
-                  <span className="text-[11px] font-bold text-gray-600">
-                    {s.ytd.polisCount} FP • {formatCompactRupiah(s.ytd.comserVal)}
-                  </span>
-                </div>
-                <ArrowRight className="w-4 h-4 text-gray-400" />
-              </div>
-            </div>
-          ))}
+          <div className="relative min-w-[240px]">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+              placeholder="Cari NIP / Nama SMT..."
+              className="w-full pl-8 pr-3 py-1.5 bg-white border-2 border-black rounded-xl text-xs font-semibold placeholder:text-gray-400 focus:outline-none shadow-[2px_2px_0px_0px_#000]"
+            />
+          </div>
         </div>
+
+        {restOfTop10.length > 0 ? (
+          <div className="divide-y-2 divide-gray-200">
+            {restOfTop10.map((s) => (
+              <div
+                key={s.id}
+                onClick={() => onSelectSmt(s)}
+                className="py-3 px-3 hover:bg-yellow-50 rounded-2xl transition-colors cursor-pointer flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-xl bg-black text-white font-black text-xs flex items-center justify-center shrink-0">
+                    #{s.ytd.rank}
+                  </span>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black font-display text-black">
+                      {s.nama}
+                    </h4>
+                    <span className="text-[11px] font-semibold text-gray-500">
+                      {s.zone} • NIP: <span className="font-bold text-black">{s.nip}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <span className="text-base sm:text-lg font-black font-display text-emerald-600 block leading-none">
+                      {s.ytd.rawSales}
+                    </span>
+                    <span className="text-[11px] font-bold text-gray-600">
+                      {s.ytd.polisCount} FP • {formatCompactRupiah(s.ytd.comserVal)}
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-400 shrink-0" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-sm font-black text-gray-500 uppercase">Tidak ada SMT ditemukan untuk NIP/Nama tersebut.</p>
+          </div>
+        )}
       </div>
 
     </section>

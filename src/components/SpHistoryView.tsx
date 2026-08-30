@@ -18,6 +18,7 @@ import {
   Table as TableIcon
 } from 'lucide-react';
 import { SmtRecord, SpRecord } from '../types';
+import { matchesSpSearch } from '../utils/searchHelper';
 
 interface SpHistoryViewProps {
   smtList: SmtRecord[];
@@ -78,13 +79,7 @@ export const SpHistoryView: React.FC<SpHistoryViewProps> = ({
 
     // Search query (Nama or NIP)
     if (effectiveSearch.trim()) {
-      const q = effectiveSearch.toLowerCase().trim();
-      result = result.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.nip.toLowerCase().includes(q) ||
-          (r.zone && r.zone.toLowerCase().includes(q))
-      );
+      result = result.filter((r) => matchesSpSearch(r, effectiveSearch));
     }
 
     // SP Type filter

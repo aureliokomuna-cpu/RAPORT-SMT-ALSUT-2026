@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { GradeLevel, MonthConfig, MonthKey, MonthlyMetric, SmtRecord, SpRecord, ZoneSummary } from '../types';
+import { cleanNip } from './searchHelper';
 
 export const MONTH_CONFIGS: MonthConfig[] = [
   { key: 'jan', name: 'Januari', short: 'JAN', salesIdx: 3, fpIdx: 4, ccIdx: 5 },
@@ -190,6 +191,8 @@ export function parseSpCsv(csvText: string): SpRecord[] {
     }
 
     if (!nip || !name || !spType || spType.includes('VLNNUM')) continue;
+    nip = cleanNip(nip);
+    if (!nip) continue;
 
     const expDate = parseDateString(expiredDateStr);
     let status: 'AKTIF' | 'EXPIRED' = 'AKTIF';
@@ -272,7 +275,7 @@ export function parseSmtCsv(csvText: string, spRecords: SpRecord[] = []): SmtRec
   const smtList: SmtRecord[] = [];
 
   dataRows.forEach((r, idx) => {
-    const nip = (r[1] || '').trim();
+    const nip = cleanNip(r[1]);
     const nama = (r[2] || '').trim();
     if (!nip || !nama) return;
 

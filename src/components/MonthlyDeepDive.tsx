@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Trophy, 
@@ -14,19 +14,30 @@ import {
 } from 'lucide-react';
 import { MonthKey, SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
+import { matchesSmtSearch } from '../utils/searchHelper';
 
 interface MonthlyDeepDiveProps {
   smtList: SmtRecord[];
   onSelectSmt: (smt: SmtRecord) => void;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
 }
 
 export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
   smtList,
   onSelectSmt,
+  searchQuery = '',
+  onSearchChange,
 }) => {
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>('jul');
   const [zoneFilter, setZoneFilter] = useState<string>('ALL');
-  const [search, setSearch] = useState<string>('');
+  const [localSearch, setLocalSearch] = useState<string>(searchQuery);
+
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  const effectiveSearch = searchQuery || localSearch;
 
   const currentMonthConfig = MONTH_CONFIGS.find((m) => m.key === selectedMonth) || MONTH_CONFIGS[6];
 
@@ -34,10 +45,7 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
   const filteredSmts = smtList
     .filter((s) => {
       const matchZone = zoneFilter === 'ALL' || s.zone === zoneFilter;
-      const matchSearch =
-        !search ||
-        s.nama.toLowerCase().includes(search.toLowerCase()) ||
-        s.nip.includes(search);
+      const matchSearch = matchesSmtSearch(s, effectiveSearch);
       return matchZone && matchSearch;
     })
     .sort((a, b) => b.monthly[selectedMonth].salesPct - a.monthly[selectedMonth].salesPct);
@@ -304,9 +312,13 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
 
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari SMT..."
+              value={effectiveSearch}
+              onChange={(e) => {
+                const val = e.target.value;
+                setLocalSearch(val);
+                if (onSearchChange) onSearchChange(val);
+              }}
+              placeholder="Cari NIP / Nama SMT..."
               className="bg-white border-2 border-black rounded-xl px-3 py-1.5 text-xs font-semibold placeholder:text-gray-400 focus:outline-none shadow-[2px_2px_0px_0px_#000]"
             />
           </div>

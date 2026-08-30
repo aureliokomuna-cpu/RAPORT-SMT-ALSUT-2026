@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
+import { matchesSmtSearch } from '../utils/searchHelper';
 import { 
   getCoachingRecord, 
   getAllCoachingRecords, 
@@ -23,15 +24,26 @@ import {
 interface TableViewProps {
   smtList: SmtRecord[];
   onSelectSmt: (smt: SmtRecord) => void;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
 }
 
-export const TableView: React.FC<TableViewProps> = ({ smtList, onSelectSmt }) => {
-  const [search, setSearch] = useState('');
+export const TableView: React.FC<TableViewProps> = ({ 
+  smtList, 
+  onSelectSmt,
+  searchQuery = '',
+  onSearchChange
+}) => {
+  const [localSearch, setLocalSearch] = useState(searchQuery);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [coachingMap, setCoachingMap] = useState<Record<string, SmtCoachingRecord>>(() => 
     getAllCoachingRecords()
   );
+
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
 
   useEffect(() => {
     setCoachingMap(getAllCoachingRecords());
@@ -46,12 +58,9 @@ export const TableView: React.FC<TableViewProps> = ({ smtList, onSelectSmt }) =>
     quickIncrementCoaching(nip);
   };
 
-  const filtered = smtList.filter(
-    (s) =>
-      s.nama.toLowerCase().includes(search.toLowerCase()) ||
-      s.nip.includes(search) ||
-      s.zone.toLowerCase().includes(search.toLowerCase())
-  );
+  const effectiveSearch = searchQuery || localSearch;
+
+  const filtered = smtList.filter((s) => matchesSmtSearch(s, effectiveSearch));
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const paginated = filtered.slice(
@@ -154,12 +163,14 @@ export const TableView: React.FC<TableViewProps> = ({ smtList, onSelectSmt }) =>
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              value={search}
+              value={effectiveSearch}
               onChange={(e) => {
-                setSearch(e.target.value);
+                const val = e.target.value;
+                setLocalSearch(val);
+                if (onSearchChange) onSearchChange(val);
                 setCurrentPage(1);
               }}
-              placeholder="Filter cepat tabel..."
+              placeholder="Cari NIP atau Nama SMT..."
               className="pl-8 pr-3 py-1.5 bg-white border-2 border-black rounded-xl text-xs font-semibold placeholder:text-gray-400 focus:outline-none shadow-[2px_2px_0px_0px_#000]"
             />
           </div>
