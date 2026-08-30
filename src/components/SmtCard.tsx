@@ -18,10 +18,10 @@ import { MonthKey, SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
 import { 
   getCoachingRecord, 
-  toggleMonthCoaching, 
   quickIncrementCoaching,
   subscribeToCoachingUpdates, 
-  SmtCoachingRecord 
+  SmtCoachingRecord,
+  WEEKS
 } from '../utils/coachingStorage';
 
 interface SmtCardProps {
@@ -41,12 +41,6 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
     });
     return unsubscribe;
   }, [smt.nip]);
-
-  const handleToggleMonthCoaching = (e: React.MouseEvent, monthKey: MonthKey) => {
-    e.stopPropagation();
-    const updated = toggleMonthCoaching(smt.nip, monthKey);
-    setCoachingData({ ...updated });
-  };
 
   const handleQuickCoach = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -251,7 +245,7 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
           </div>
         </div>
 
-        {/* Interactive Coaching Tracker & Checklist Bar */}
+        {/* Interactive Weekly Coaching Tracker & Checklist Bar */}
         <div className="bg-[#FFFBEB] border-2 border-black rounded-2xl p-2.5 mb-3.5 shadow-[2px_2px_0px_0px_#000]">
           <div className="flex items-center justify-between gap-1 mb-1.5">
             <div className="flex items-center gap-1.5">
@@ -259,39 +253,55 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
                 🎯
               </span>
               <span className="text-[11px] font-black uppercase tracking-tight text-gray-800">
-                Log Coaching SMT
+                Log Coaching (Mingguan)
               </span>
             </div>
 
-            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border border-black ${
-              coachingData.totalCount > 0 
-                ? 'bg-[#06D6A0] text-black shadow-[1px_1px_0px_0px_#000]' 
-                : 'bg-[#FFD166] text-black'
-            }`}>
-              {coachingData.totalCount > 0 ? `✅ ${coachingData.totalCount}x Dicoaching` : '⚠️ Belum Dicoaching (0x)'}
-            </span>
+            <button
+              type="button"
+              onClick={handleQuickCoach}
+              title="Klik untuk tambah +1 sesi coaching mingguan cepat"
+              className={`text-[10px] font-black px-2 py-0.5 rounded-lg border border-black transition-transform hover:scale-105 cursor-pointer flex items-center gap-1 ${
+                coachingData.totalCount > 0 
+                  ? 'bg-[#06D6A0] text-black shadow-[1px_1px_0px_0px_#000]' 
+                  : 'bg-[#FFD166] text-black'
+              }`}
+            >
+              <span>{coachingData.totalCount > 0 ? `✅ ${coachingData.totalCount}x Minggu` : '⚠️ 0x Minggu'}</span>
+              <span className="text-[9px] font-black bg-black text-[#FFE600] px-1 rounded">+1</span>
+            </button>
           </div>
 
-          {/* 7-Month Quick Coaching Checkboxes */}
-          <div className="flex items-center justify-between gap-1 pt-1 border-t border-amber-300/80">
-            <span className="text-[9px] font-bold text-gray-500 uppercase">Centang Bulan:</span>
+          {/* 7-Month Weekly Status Pills (4 weeks each: W1..W4) */}
+          <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-amber-300/80">
+            <span className="text-[9px] font-bold text-gray-500 uppercase">W1-W4:</span>
             <div className="flex items-center gap-1">
               {MONTH_CONFIGS.map((m) => {
-                const isChecked = !!coachingData.checkedMonths[m.key];
+                const monthWeeks = coachingData.checkedWeeks?.[m.key] || { w1: false, w2: false, w3: false, w4: false };
+                const coachedWeeksCount = (monthWeeks.w1 ? 1 : 0) + (monthWeeks.w2 ? 1 : 0) + (monthWeeks.w3 ? 1 : 0) + (monthWeeks.w4 ? 1 : 0);
+                const isFull = coachedWeeksCount === 4;
+                const hasSome = coachedWeeksCount > 0;
+
                 return (
-                  <button
+                  <div
                     key={m.key}
-                    type="button"
-                    title={`Klik untuk centang coaching bulan ${m.name}`}
-                    onClick={(e) => handleToggleMonthCoaching(e, m.key)}
-                    className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-transform hover:scale-110 cursor-pointer ${
-                      isChecked
-                        ? 'bg-black text-[#FFE600] border-black shadow-[1px_1px_0px_0px_#FFE600]'
-                        : 'bg-white text-gray-500 border-gray-300 hover:border-black'
+                    title={`${m.name}: ${coachedWeeksCount}/4 Minggu tercoaching (W1:${monthWeeks.w1 ? '✓' : '-'} W2:${monthWeeks.w2 ? '✓' : '-'} W3:${monthWeeks.w3 ? '✓' : '-'} W4:${monthWeeks.w4 ? '✓' : '-'})`}
+                    className={`px-1 py-0.5 rounded-lg text-[9px] font-black border flex flex-col items-center leading-none ${
+                      isFull
+                        ? 'bg-black text-[#FFE600] border-black shadow-[1px_1px_0px_0px_#06D6A0]'
+                        : hasSome
+                        ? 'bg-[#FFE600] text-black border-black'
+                        : 'bg-white text-gray-400 border-gray-300'
                     }`}
                   >
-                    {isChecked ? `✓${m.short[0]}` : m.short[0]}
-                  </button>
+                    <span>{m.short[0]}</span>
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      <span className={`w-1 h-1 rounded-full ${monthWeeks.w1 ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                      <span className={`w-1 h-1 rounded-full ${monthWeeks.w2 ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                      <span className={`w-1 h-1 rounded-full ${monthWeeks.w3 ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                      <span className={`w-1 h-1 rounded-full ${monthWeeks.w4 ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                    </div>
+                  </div>
                 );
               })}
             </div>

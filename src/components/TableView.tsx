@@ -76,7 +76,7 @@ export const TableView: React.FC<TableViewProps> = ({ smtList, onSelectSmt }) =>
       'YTD Polis FP',
       'YTD Clean & Care',
       'Bulan Achieved',
-      'Coaching (Kali)',
+      'Coaching Selesai (Minggu)',
       'Hasil Evaluasi',
     ];
 
@@ -98,7 +98,7 @@ export const TableView: React.FC<TableViewProps> = ({ smtList, onSelectSmt }) =>
         s.ytd.polisCount,
         `"${s.ytd.rawComser}"`,
         `${s.ytd.salesAchCount}/7`,
-        `${coachRec.totalCount || 0}x`,
+        `${coachRec.totalCount || 0} Minggu`,
         `"${s.ytd.evaluationResult}"`,
       ];
     });
@@ -194,7 +194,7 @@ export const TableView: React.FC<TableViewProps> = ({ smtList, onSelectSmt }) =>
               <th className="py-3 px-3 border-r border-gray-800 text-right">Comser</th>
               <th className="py-3 px-2 border-r border-gray-800 text-center">Ach</th>
               <th className="py-3 px-2.5 border-r border-gray-800 text-center bg-amber-950 text-[#FFE600]">
-                Coaching
+                Coaching (W)
               </th>
               <th className="py-3 px-3 border-r border-gray-800">Evaluasi Result</th>
               <th className="py-3 px-3 text-center">Aksi</th>
@@ -260,7 +260,7 @@ export const TableView: React.FC<TableViewProps> = ({ smtList, onSelectSmt }) =>
                     <button
                       type="button"
                       onClick={(e) => handleQuickCoachRow(e, s.nip)}
-                      title={`Klik untuk tambah log coaching untuk ${s.nama}`}
+                      title={`Klik untuk tambah log coaching mingguan untuk ${s.nama}`}
                       className={`px-2 py-0.5 rounded-lg border font-black text-[11px] transition-transform hover:scale-105 cursor-pointer flex items-center justify-center gap-1 mx-auto ${
                         coachCount > 0
                           ? 'bg-[#06D6A0] text-black border-black shadow-[1px_1px_0px_0px_#000]'
@@ -268,7 +268,7 @@ export const TableView: React.FC<TableViewProps> = ({ smtList, onSelectSmt }) =>
                       }`}
                     >
                       <UserCheck className="w-3 h-3" />
-                      <span>{coachCount}x</span>
+                      <span>{coachCount} Mgg</span>
                     </button>
                   </td>
 
