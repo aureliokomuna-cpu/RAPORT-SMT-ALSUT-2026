@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Trophy, 
   Sparkles, 
@@ -9,10 +9,20 @@ import {
   Flame,
   ArrowRight,
   Shield,
-  Sparkle
+  Sparkle,
+  UserCheck,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { MonthKey, SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
+import { 
+  getCoachingRecord, 
+  toggleMonthCoaching, 
+  quickIncrementCoaching,
+  subscribeToCoachingUpdates, 
+  SmtCoachingRecord 
+} from '../utils/coachingStorage';
 
 interface SmtCardProps {
   smt: SmtRecord;
@@ -20,6 +30,30 @@ interface SmtCardProps {
 }
 
 export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
+  const [coachingData, setCoachingData] = useState<SmtCoachingRecord>(() => 
+    getCoachingRecord(smt.nip)
+  );
+
+  useEffect(() => {
+    setCoachingData(getCoachingRecord(smt.nip));
+    const unsubscribe = subscribeToCoachingUpdates(() => {
+      setCoachingData(getCoachingRecord(smt.nip));
+    });
+    return unsubscribe;
+  }, [smt.nip]);
+
+  const handleToggleMonthCoaching = (e: React.MouseEvent, monthKey: MonthKey) => {
+    e.stopPropagation();
+    const updated = toggleMonthCoaching(smt.nip, monthKey);
+    setCoachingData({ ...updated });
+  };
+
+  const handleQuickCoach = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = quickIncrementCoaching(smt.nip);
+    setCoachingData({ ...updated });
+  };
+
   const isTop3 = smt.ytd.rank <= 3;
   const isTop1 = smt.ytd.rank === 1;
 
@@ -128,6 +162,12 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
             <span className="text-[11px] font-black text-black bg-[#FFE600] border border-black px-2 py-0.5 rounded-full">
               Grade {smt.ytd.overallGrade}
             </span>
+            {smt.spList && smt.spList.length > 0 && (
+              <span className="text-[10px] font-black text-white bg-[#FF3E83] border border-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-[1px_1px_0px_0px_#000]">
+                <span>🚨</span>
+                <span>SP ({smt.spList[0].spLabel})</span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -208,6 +248,53 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
               }`}
               style={{ width: `${Math.min(100, Math.max(5, smt.ytd.salesPct))}%` }}
             />
+          </div>
+        </div>
+
+        {/* Interactive Coaching Tracker & Checklist Bar */}
+        <div className="bg-[#FFFBEB] border-2 border-black rounded-2xl p-2.5 mb-3.5 shadow-[2px_2px_0px_0px_#000]">
+          <div className="flex items-center justify-between gap-1 mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-md bg-[#FFE600] text-black border border-black flex items-center justify-center font-black text-xs">
+                🎯
+              </span>
+              <span className="text-[11px] font-black uppercase tracking-tight text-gray-800">
+                Log Coaching SMT
+              </span>
+            </div>
+
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border border-black ${
+              coachingData.totalCount > 0 
+                ? 'bg-[#06D6A0] text-black shadow-[1px_1px_0px_0px_#000]' 
+                : 'bg-[#FFD166] text-black'
+            }`}>
+              {coachingData.totalCount > 0 ? `✅ ${coachingData.totalCount}x Dicoaching` : '⚠️ Belum Dicoaching (0x)'}
+            </span>
+          </div>
+
+          {/* 7-Month Quick Coaching Checkboxes */}
+          <div className="flex items-center justify-between gap-1 pt-1 border-t border-amber-300/80">
+            <span className="text-[9px] font-bold text-gray-500 uppercase">Centang Bulan:</span>
+            <div className="flex items-center gap-1">
+              {MONTH_CONFIGS.map((m) => {
+                const isChecked = !!coachingData.checkedMonths[m.key];
+                return (
+                  <button
+                    key={m.key}
+                    type="button"
+                    title={`Klik untuk centang coaching bulan ${m.name}`}
+                    onClick={(e) => handleToggleMonthCoaching(e, m.key)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-transform hover:scale-110 cursor-pointer ${
+                      isChecked
+                        ? 'bg-black text-[#FFE600] border-black shadow-[1px_1px_0px_0px_#FFE600]'
+                        : 'bg-white text-gray-500 border-gray-300 hover:border-black'
+                    }`}
+                  >
+                    {isChecked ? `✓${m.short[0]}` : m.short[0]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

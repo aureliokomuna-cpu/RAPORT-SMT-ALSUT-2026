@@ -8,17 +8,26 @@ import { MonthlyDeepDive } from './components/MonthlyDeepDive';
 import { LeaderboardPodium } from './components/LeaderboardPodium';
 import { ZoneBattleView } from './components/ZoneBattleView';
 import { TableView } from './components/TableView';
+import { SpHistoryView } from './components/SpHistoryView';
 
-import { FilterState, SmtRecord, ZoneSummary } from './types';
-import { computeZoneSummaries, parseSmtCsv } from './utils/parser';
-import { DEFAULT_CSV_URL, FALLBACK_CSV_DATA } from './data/defaultCsv';
+import { FilterState, SmtRecord, SpRecord, ZoneSummary } from './types';
+import { computeZoneSummaries, parseSmtCsv, parseSpCsv } from './utils/parser';
+import { DEFAULT_CSV_URL, DEFAULT_SP_CSV_URL, FALLBACK_CSV_DATA, FALLBACK_SP_CSV_DATA } from './data/defaultCsv';
 import { Sparkles, HelpCircle, Layers, ArrowUp, RefreshCw } from 'lucide-react';
 
 export default function App() {
-  // Initialize with fallback embedded data so it loads instantly with 0 latency
-  const [smtList, setSmtList] = useState<SmtRecord[]>(() => parseSmtCsv(FALLBACK_CSV_DATA));
+  // Initialize SP records from fallback data
+  const [allSpRecords, setAllSpRecords] = useState<SpRecord[]>(() => 
+    parseSpCsv(FALLBACK_SP_CSV_DATA)
+  );
+
+  // Initialize SMT list with SP records integrated
+  const [smtList, setSmtList] = useState<SmtRecord[]>(() => 
+    parseSmtCsv(FALLBACK_CSV_DATA, parseSpCsv(FALLBACK_SP_CSV_DATA))
+  );
+
   const [zoneSummaries, setZoneSummaries] = useState<ZoneSummary[]>(() => 
-    computeZoneSummaries(parseSmtCsv(FALLBACK_CSV_DATA))
+    computeZoneSummaries(parseSmtCsv(FALLBACK_CSV_DATA, parseSpCsv(FALLBACK_SP_CSV_DATA)))
   );
   
   const [isLoading, setIsLoading] = useState(false);
@@ -36,23 +45,41 @@ export default function App() {
     activeView: 'bento',
   });
 
-  // Fetch live CSV data on mount from Google Sheet published URL
+  // Fetch live CSV data for both SMT and SP sheets on mount
   const fetchLiveData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(DEFAULT_CSV_URL, { cache: 'no-cache' });
-      if (!response.ok) throw new Error('Gagal memuat Google Sheet');
-      const csvText = await response.text();
-      if (csvText && csvText.length > 200) {
-        const parsed = parseSmtCsv(csvText);
-        if (parsed.length > 0) {
-          setSmtList(parsed);
-          setZoneSummaries(computeZoneSummaries(parsed));
-          setLastUpdated(new Date());
+      // Parallel fetch for SMT and SP Google Sheets
+      const [smtRes, spRes] = await Promise.allSettled([
+        fetch(DEFAULT_CSV_URL, { cache: 'no-cache' }),
+        fetch(DEFAULT_SP_CSV_URL, { cache: 'no-cache' }),
+      ]);
+
+      let parsedSp: SpRecord[] = allSpRecords;
+      if (spRes.status === 'fulfilled' && spRes.value.ok) {
+        const spCsvText = await spRes.value.text();
+        if (spCsvText && spCsvText.length > 50) {
+          const freshSp = parseSpCsv(spCsvText);
+          if (freshSp.length > 0) {
+            parsedSp = freshSp;
+            setAllSpRecords(freshSp);
+          }
+        }
+      }
+
+      if (smtRes.status === 'fulfilled' && smtRes.value.ok) {
+        const smtCsvText = await smtRes.value.text();
+        if (smtCsvText && smtCsvText.length > 200) {
+          const freshSmts = parseSmtCsv(smtCsvText, parsedSp);
+          if (freshSmts.length > 0) {
+            setSmtList(freshSmts);
+            setZoneSummaries(computeZoneSummaries(freshSmts));
+            setLastUpdated(new Date());
+          }
         }
       }
     } catch (err) {
-      console.warn('Menggunakan data cache fallback offline:', err);
+      console.warn('Menggunakan data fallback offline:', err);
     } finally {
       setIsLoading(false);
     }
@@ -75,19 +102,27 @@ export default function App() {
     return Array.from(set);
   }, [smtList]);
 
-  // Filtered & Sorted SMT list
+  // Robust Filtered & Sorted SMT list with flexible Search
   const filteredSmts = useMemo(() => {
     let result = [...smtList];
 
-    // Search query
-    if (filters.searchQuery.trim()) {
-      const q = filters.searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (s) =>
-          s.nama.toLowerCase().includes(q) ||
-          s.nip.toLowerCase().includes(q) ||
-          s.zone.toLowerCase().includes(q)
-      );
+    // Enhanced Search query for NIP and Name
+    if (filters.searchQuery && filters.searchQuery.trim()) {
+      const q = filters.searchQuery.trim().toLowerCase();
+      const tokens = q.split(/\s+/).filter(Boolean);
+
+      result = result.filter((s) => {
+        const nameLower = s.nama.toLowerCase();
+        const nipLower = s.nip.toLowerCase();
+        const zoneLower = s.zone.toLowerCase();
+
+        // Match all space-separated search tokens for precision
+        return tokens.every((token) => 
+          nameLower.includes(token) || 
+          nipLower.includes(token) || 
+          zoneLower.includes(token)
+        );
+      });
     }
 
     // Zone filter
@@ -217,7 +252,7 @@ export default function App() {
                   Tidak Ada SMT Ditemukan
                 </h3>
                 <p className="text-xs text-gray-500 font-semibold mt-1">
-                  Coba ubah kata kunci pencarian atau reset filter status/zona.
+                  Coba ubah kata kunci pencarian NIP/Nama atau reset filter status/zona.
                 </p>
                 <button
                   onClick={() =>
@@ -273,6 +308,16 @@ export default function App() {
           />
         )}
 
+        {filters.activeView === 'sp_history' && (
+          <SpHistoryView
+            smtList={smtList}
+            allSpRecords={allSpRecords}
+            onSelectSmt={(smt) => setSelectedSmt(smt)}
+            searchQuery={filters.searchQuery}
+            onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
+          />
+        )}
+
       </main>
 
       {/* SMT Detailed Bento Raport Modal */}
@@ -295,16 +340,19 @@ export default function App() {
               </span>
             </div>
             <p className="text-xs font-medium text-gray-400 mt-1">
-              Evaluasi YTD Semester 1 • Sistem Penilaian Sales & Derivatif Produk
+              Evaluasi YTD Semester 1 • Sistem Penilaian Sales & Derivatif Produk • Historical SP Terintegrasi
             </p>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap justify-center text-xs font-bold text-gray-400">
             <span className="bg-white/10 px-3 py-1 rounded-full border border-white/20">
-              📊 150 SMT Aktif
+              📊 {smtList.length} SMT Aktif
             </span>
             <span className="bg-white/10 px-3 py-1 rounded-full border border-white/20">
               🛡️ Furnipro & Clean Care
+            </span>
+            <span className="bg-[#FF3E83] text-white px-3 py-1 rounded-full font-black border border-white/20">
+              ⚠️ {allSpRecords.length} Data SP
             </span>
             <span className="bg-[#FFE600] text-black px-3 py-1 rounded-full font-black">
               Bento Gen-Z UI

@@ -9,7 +9,8 @@ import {
   Trophy, 
   Calendar, 
   Layers,
-  CheckCircle2
+  CheckCircle2,
+  ShieldAlert
 } from 'lucide-react';
 import { FilterState } from '../types';
 
@@ -164,6 +165,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Layers className="w-3.5 h-3.5 text-[#38BDF8]" />
               <span>Zona Battle</span>
+            </button>
+
+            <button
+              id="view-sp-history-button"
+              onClick={() => onFilterChange({ activeView: 'sp_history' })}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer ${
+                filters.activeView === 'sp_history'
+                  ? 'bg-black text-white shadow-[2px_2px_0px_0px_#FF3E83]'
+                  : 'bg-white text-gray-800 hover:bg-gray-100 shadow-[2px_2px_0px_0px_#000]'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-[#FF3E83]" />
+              <span>Historical SP</span>
+              <span className="bg-[#FF3E83] text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">SPV</span>
             </button>
           </div>
 

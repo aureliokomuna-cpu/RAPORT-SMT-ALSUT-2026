@@ -11,6 +11,20 @@ export interface MonthConfig {
 
 export type GradeLevel = 'S+' | 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
 
+export interface SpRecord {
+  id: string;
+  nip: string;
+  name: string;
+  spType: 'S1' | 'S2' | 'S3' | string;
+  spLabel: string;
+  startDate: string;
+  expiredDate: string;
+  status: 'AKTIF' | 'EXPIRED';
+  remainingDays: number;
+  zone?: string;
+  notes?: string;
+}
+
 export interface MonthlyMetric {
   monthKey: MonthKey;
   monthName: string;
@@ -55,6 +69,11 @@ export interface SmtRecord {
   zone: string;
   monthly: Record<MonthKey, MonthlyMetric>;
   ytd: SmtYtd;
+  spList: SpRecord[];
+  hasActiveSp: boolean;
+  activeSpCount: number;
+  latestSp?: SpRecord;
+  coachingCount?: number;
 }
 
 export interface ZoneSummary {
@@ -67,6 +86,7 @@ export interface ZoneSummary {
   safeCount: number;
   warningCount: number;
   pantauanCount: number;
+  spCount: number;
   topSmt: string;
 }
 
@@ -77,14 +97,17 @@ export type StatusCategory =
   | 'WARN_DERIVATIVE'
   | 'WARN_COMSER'
   | 'WARN_FP'
-  | 'PANTAUAN';
+  | 'PANTAUAN'
+  | 'WITH_SP';
 
 export interface FilterState {
   searchQuery: string;
   selectedZone: string;
   selectedStatus: StatusCategory;
   selectedMonth: MonthKey | 'ytd';
-  sortBy: 'rank' | 'sales' | 'polis' | 'comser' | 'name' | 'achCount';
+  sortBy: 'rank' | 'sales' | 'polis' | 'comser' | 'name' | 'achCount' | 'sp';
   sortOrder: 'asc' | 'desc';
-  activeView: 'bento' | 'table' | 'leaderboard' | 'zones' | 'monthly_drill';
+  activeView: 'bento' | 'table' | 'leaderboard' | 'zones' | 'monthly_drill' | 'sp_history';
+  spFilter?: 'ALL' | 'ACTIVE_SP' | 'NO_SP' | 'S1' | 'S2';
 }
+

@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import { GradeLevel, MonthConfig, MonthKey, MonthlyMetric, SmtRecord, ZoneSummary } from '../types';
+import { GradeLevel, MonthConfig, MonthKey, MonthlyMetric, SmtRecord, SpRecord, ZoneSummary } from '../types';
 
 export const MONTH_CONFIGS: MonthConfig[] = [
   { key: 'jan', name: 'Januari', short: 'JAN', salesIdx: 3, fpIdx: 4, ccIdx: 5 },
@@ -124,7 +124,145 @@ export function calculateMonthlyGrade(salesPct: number, fpCount: number, ccVal: 
   };
 }
 
-export function parseSmtCsv(csvText: string): SmtRecord[] {
+export function parseDateString(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  // Format typically: '15-06-2026 00:00:00' or '10-07-2026 0:00:00' or '15-06-2026'
+  const parts = dateStr.trim().split(' ')[0].split('-');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+      return new Date(year, month, day);
+    }
+  }
+  return null;
+}
+
+export function parseSpCsv(csvText: string): SpRecord[] {
+  const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: false });
+  const rawRows = parsed.data;
+  if (!rawRows || rawRows.length < 2) return [];
+
+  const spList: SpRecord[] = [];
+  const now = new Date(2026, 7, 30); // Ref reference date Aug 30, 2026
+
+  // Find header row or scan rows
+  let dataStartIndex = 0;
+  for (let i = 0; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    if (row.some(cell => cell && cell.includes('VLNEmpID'))) {
+      dataStartIndex = i + 1;
+      break;
+    }
+  }
+
+  for (let i = dataStartIndex; i < rawRows.length; i++) {
+    const r = rawRows[i];
+    if (!r || r.length < 3) continue;
+
+    // Col mapping: row can be offset or empty leading cells
+    let nip = '';
+    let name = '';
+    let spType = '';
+    let startDateStr = '';
+    let expiredDateStr = '';
+
+    // Search for NIP (numeric string) and name
+    const validCells = r.map(c => (c || '').trim()).filter(c => c !== '');
+    if (validCells.length >= 3) {
+      // Look for cell that matches NIP pattern (digits)
+      const nipIdx = r.findIndex(c => c && /^\d{4,7}$/.test(c.trim()));
+      if (nipIdx !== -1) {
+        nip = (r[nipIdx] || '').trim();
+        name = (r[nipIdx + 1] || '').trim();
+        spType = (r[nipIdx + 2] || '').trim().toUpperCase();
+        startDateStr = (r[nipIdx + 3] || '').trim();
+        expiredDateStr = (r[nipIdx + 4] || '').trim();
+      } else {
+        // Fallback positioning
+        nip = validCells[0];
+        name = validCells[1] || '';
+        spType = (validCells[2] || '').toUpperCase();
+        startDateStr = validCells[3] || '';
+        expiredDateStr = validCells[4] || '';
+      }
+    }
+
+    if (!nip || !name || !spType || spType.includes('VLNNUM')) continue;
+
+    const expDate = parseDateString(expiredDateStr);
+    let status: 'AKTIF' | 'EXPIRED' = 'AKTIF';
+    let remainingDays = 0;
+
+    if (expDate) {
+      const diffTime = expDate.getTime() - now.getTime();
+      remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      status = remainingDays >= 0 ? 'AKTIF' : 'EXPIRED';
+    }
+
+    let spLabel = 'Surat Peringatan 1 (SP 1)';
+    if (spType === 'S2' || spType.includes('2')) spLabel = 'Surat Peringatan 2 (SP 2)';
+    else if (spType === 'S3' || spType.includes('3')) spLabel = 'Surat Peringatan 3 (SP 3)';
+
+    spList.push({
+      id: `sp-${nip}-${spType}-${i}`,
+      nip,
+      name,
+      spType,
+      spLabel,
+      startDate: startDateStr ? startDateStr.split(' ')[0] : '-',
+      expiredDate: expiredDateStr ? expiredDateStr.split(' ')[0] : '-',
+      status,
+      remainingDays,
+      notes: `Catatan disiplin internal periode ${startDateStr.split(' ')[0]} s/d ${expiredDateStr.split(' ')[0]}`,
+    });
+  }
+
+  return spList;
+}
+
+export function mergeSmtWithSp(smtList: SmtRecord[], spList: SpRecord[]): SmtRecord[] {
+  const spMap = new Map<string, SpRecord[]>();
+
+  spList.forEach(sp => {
+    const list = spMap.get(sp.nip) || [];
+    list.push(sp);
+    spMap.set(sp.nip, list);
+  });
+
+  return smtList.map(smt => {
+    // Find matching SP by NIP or normalized name
+    let matchedSps = spMap.get(smt.nip) || [];
+    if (matchedSps.length === 0) {
+      const normName = smt.nama.toLowerCase().replace(/[^a-z]/g, '');
+      const foundBySpName = spList.filter(sp => {
+        const normSpName = sp.name.toLowerCase().replace(/[^a-z]/g, '');
+        return normSpName.includes(normName) || normName.includes(normSpName);
+      });
+      if (foundBySpName.length > 0) {
+        matchedSps = foundBySpName;
+      }
+    }
+
+    // Attach zone info to SP record
+    matchedSps = matchedSps.map(sp => ({ ...sp, zone: smt.zone }));
+
+    const activeSps = matchedSps.filter(sp => sp.status === 'AKTIF');
+    const hasActiveSp = activeSps.length > 0;
+    const latestSp = matchedSps.length > 0 ? matchedSps[matchedSps.length - 1] : undefined;
+
+    return {
+      ...smt,
+      spList: matchedSps,
+      hasActiveSp,
+      activeSpCount: activeSps.length,
+      latestSp,
+    };
+  });
+}
+
+export function parseSmtCsv(csvText: string, spRecords: SpRecord[] = []): SmtRecord[] {
   const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: false });
   const rawRows = parsed.data;
   if (!rawRows || rawRows.length < 3) return [];
@@ -249,6 +387,9 @@ export function parseSmtCsv(csvText: string): SmtRecord[] {
         overallGrade,
         rank: 0,
       },
+      spList: [],
+      hasActiveSp: false,
+      activeSpCount: 0,
     });
   });
 
@@ -264,13 +405,16 @@ export function parseSmtCsv(csvText: string): SmtRecord[] {
       (a, b) => b.monthly[m.key].salesPct - a.monthly[m.key].salesPct
     );
     sortedByMonth.forEach((smt, rIdx) => {
-      // update reference
       const original = smtList.find((s) => s.id === smt.id);
       if (original) {
         original.monthly[m.key].rankInMonth = rIdx + 1;
       }
     });
   });
+
+  if (spRecords.length > 0) {
+    return mergeSmtWithSp(smtList, spRecords);
+  }
 
   return smtList;
 }
@@ -305,6 +449,7 @@ export function computeZoneSummaries(smtList: SmtRecord[]): ZoneSummary[] {
     const pantauanCount = members.filter((m) =>
       m.ytd.evaluationResult.includes('PANTAUAN')
     ).length;
+    const spCount = members.filter((m) => m.hasActiveSp || (m.spList && m.spList.length > 0)).length;
 
     const topMember = [...members].sort((a, b) => b.ytd.salesPct - a.ytd.salesPct)[0];
 
@@ -318,9 +463,11 @@ export function computeZoneSummaries(smtList: SmtRecord[]): ZoneSummary[] {
       safeCount,
       warningCount,
       pantauanCount,
+      spCount,
       topSmt: topMember ? `${topMember.nama} (${topMember.ytd.salesPct}%)` : '-',
     });
   });
 
   return summaries.sort((a, b) => b.avgSalesPct - a.avgSalesPct);
 }
+

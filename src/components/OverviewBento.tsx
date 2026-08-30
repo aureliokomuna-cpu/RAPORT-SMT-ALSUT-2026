@@ -9,10 +9,12 @@ import {
   TrendingUp, 
   Award,
   CircleDollarSign,
-  FileCheck
+  FileCheck,
+  BarChart3,
+  CalendarCheck
 } from 'lucide-react';
 import { SmtRecord, ZoneSummary } from '../types';
-import { formatCompactRupiah, formatPct } from '../utils/parser';
+import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
 
 interface OverviewBentoProps {
   smtList: SmtRecord[];
@@ -44,8 +46,26 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   const totalPolis = smtList.reduce((sum, s) => sum + s.ytd.polisCount, 0);
   const totalComser = smtList.reduce((sum, s) => sum + s.ytd.comserVal, 0);
 
-  // Top SMT (#1)
-  const topSmt = smtList[0];
+  // Compute Store-wide Monthly Average Sales Productivity (Jan - Jul)
+  const monthlyAverages = MONTH_CONFIGS.map((m) => {
+    const validSmts = smtList.filter((s) => s.monthly[m.key] && s.monthly[m.key].salesPct > 0);
+    const avg = validSmts.length > 0 
+      ? validSmts.reduce((acc, s) => acc + s.monthly[m.key].salesPct, 0) / validSmts.length
+      : 0;
+    const achievedCount = smtList.filter((s) => s.monthly[m.key]?.isAchieved).length;
+    return {
+      ...m,
+      avgSalesPct: avg,
+      achievedCount,
+      achievedPct: totalSmt > 0 ? (achievedCount / totalSmt) * 100 : 0,
+    };
+  });
+
+  const overallMonthlyAvg =
+    monthlyAverages.reduce((sum, m) => sum + m.avgSalesPct, 0) / (monthlyAverages.length || 1);
+
+  const highestMonth = [...monthlyAverages].sort((a, b) => b.avgSalesPct - a.avgSalesPct)[0];
+
   const topZone = zoneSummaries[0];
 
   return (
@@ -53,7 +73,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
       {/* Bento Grid Layout */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 sm:gap-4">
         
-        {/* Card 1: Total SMT & Status (Span 4) */}
+        {/* Card 1: Total SMT & Store Overview (Span 4) */}
         <div className="lg:col-span-4 bg-[#FFE600] border-3 border-black rounded-3xl p-5 bento-shadow relative overflow-hidden flex flex-col justify-between">
           <div className="flex justify-between items-start">
             <div>
@@ -71,7 +91,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
 
           <div className="mt-4 pt-3 border-t-2 border-black/20 flex items-center justify-between text-xs font-black">
             <span className="flex items-center gap-1 text-black/80">
-              <Zap className="w-3.5 h-3.5 text-black" /> Store Avg Sales:
+              <Zap className="w-3.5 h-3.5 text-black" /> Store Avg YTD:
             </span>
             <span className="bg-black text-[#FFE600] px-2.5 py-1 rounded-lg font-black text-sm">
               {formatPct(avgSales)}
@@ -82,46 +102,73 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           </div>
         </div>
 
-        {/* Card 2: 🏆 Top SMT Spotlight / GOAT (Span 4) */}
-        {topSmt && (
-          <div 
-            onClick={() => onSelectSmt(topSmt)}
-            className="lg:col-span-4 bg-white border-3 border-black rounded-3xl p-5 bento-shadow bento-shadow-hover cursor-pointer relative overflow-hidden flex flex-col justify-between group"
-          >
-            <div>
-              <div className="flex justify-between items-start mb-2">
-                <span className="bg-[#FF3E83] text-white px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider border border-black shadow-[1px_1px_0px_0px_#000] flex items-center gap-1">
-                  <Flame className="w-3 h-3 animate-pulse" /> #1 SMT Final Boss
-                </span>
-                <span className="text-xs font-black bg-black text-white px-2 py-0.5 rounded-md">
-                  {topSmt.zone}
-                </span>
-              </div>
-              <h3 className="text-xl font-black font-display text-black truncate group-hover:text-[#FF3E83] transition-colors">
-                {topSmt.nama}
-              </h3>
-              <p className="text-xs font-bold text-gray-500">NIP: {topSmt.nip}</p>
+        {/* Card 2: 📈 Average Jualan SMT per Bulan (Produktifitas SMT) (Span 4) */}
+        <div className="lg:col-span-4 bg-white border-3 border-black rounded-3xl p-5 bento-shadow relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start mb-2">
+              <span className="bg-[#FF3E83] text-white px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider border border-black shadow-[1px_1px_0px_0px_#000] flex items-center gap-1">
+                <BarChart3 className="w-3 h-3" /> Produktifitas SMT
+              </span>
+              <span className="text-[10px] font-black bg-black text-[#FFE600] px-2 py-0.5 rounded-md">
+                7 Bulan S1
+              </span>
             </div>
 
-            <div className="mt-3 bg-[#F0F2F5] border-2 border-black rounded-2xl p-2.5 flex items-center justify-between">
+            <div className="flex items-baseline justify-between gap-2 mt-1">
               <div>
-                <p className="text-[10px] font-bold uppercase text-gray-500">YTD Sales Ach.</p>
-                <p className="text-2xl font-black text-emerald-600 font-display leading-tight">
-                  {topSmt.ytd.rawSales}
-                </p>
+                <p className="text-[10px] font-bold uppercase text-gray-500">Rata-rata Sales / Bulan</p>
+                <h3 className="text-3xl sm:text-4xl font-black font-display text-black tracking-tight leading-none mt-0.5">
+                  {formatPct(overallMonthlyAvg)}
+                </h3>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold uppercase text-gray-500">Derivative</p>
-                <p className="text-xs font-black text-black">
-                  {topSmt.ytd.polisCount} Polis • {formatCompactRupiah(topSmt.ytd.comserVal)}
-                </p>
+                <span className="inline-block text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-400 px-2 py-0.5 rounded-lg">
+                  Peak: {highestMonth ? `${highestMonth.short} (${formatPct(highestMonth.avgSalesPct)})` : '-'}
+                </span>
               </div>
             </div>
-            <div className="mt-2 text-[11px] font-extrabold text-indigo-700 flex items-center justify-end gap-1">
-              <span>Buka Raport Digital</span> →
+          </div>
+
+          {/* Monthly Mini Bar Indicators (JAN - JUL) */}
+          <div className="mt-3 pt-2.5 border-t-2 border-gray-200">
+            <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 mb-1.5">
+              <span>Trend Produktifitas SMT:</span>
+              <span className="text-black font-black">Store Avg/Bulan</span>
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1">
+              {monthlyAverages.map((m) => {
+                const isOver100 = m.avgSalesPct >= 100;
+                return (
+                  <div
+                    key={m.key}
+                    title={`${m.name}: Rata-rata SMT ${formatPct(m.avgSalesPct)} (${m.achievedCount}/${totalSmt} SMT Lolos Target)`}
+                    className="flex flex-col items-center bg-gray-50 border border-black/40 rounded-xl p-1 text-center hover:bg-yellow-50 transition-colors"
+                  >
+                    <span className="text-[9px] font-black text-gray-500 leading-none">
+                      {m.short}
+                    </span>
+                    <span className={`text-[10px] font-black leading-tight my-0.5 ${
+                      m.avgSalesPct >= 120 ? 'text-emerald-700' : isOver100 ? 'text-blue-700' : 'text-amber-700'
+                    }`}>
+                      {Math.round(m.avgSalesPct)}%
+                    </span>
+                    <span className={`text-[8px] font-black px-1 py-0.2 rounded leading-none ${
+                      isOver100 ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'
+                    }`}>
+                      {m.achievedCount}👥
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        )}
+
+          <div className="mt-2 text-[10px] font-extrabold text-gray-500 flex items-center justify-between">
+            <span>Standar Target: 100%</span>
+            <span className="text-black font-black">7 Bulan Terhitung ✨</span>
+          </div>
+        </div>
 
         {/* Card 3: Health Breakdown Status (Span 4) */}
         <div className="lg:col-span-4 bg-[#118AB2] text-white border-3 border-black rounded-3xl p-5 bento-shadow flex flex-col justify-between">

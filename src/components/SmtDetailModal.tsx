@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   X, 
@@ -18,10 +18,24 @@ import {
   Award,
   Zap,
   Info,
-  CheckCircle2
+  CheckCircle2,
+  UserCheck,
+  CheckSquare,
+  Square,
+  PlusCircle,
+  Trash2,
+  MessageSquare
 } from 'lucide-react';
 import { MonthKey, SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct, formatRupiah, MONTH_CONFIGS } from '../utils/parser';
+import { 
+  getCoachingRecord, 
+  toggleMonthCoaching, 
+  addCustomCoachingLog, 
+  removeCustomCoachingLog,
+  subscribeToCoachingUpdates,
+  SmtCoachingRecord 
+} from '../utils/coachingStorage';
 
 interface SmtDetailModalProps {
   smt: SmtRecord | null;
@@ -35,8 +49,64 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
   onNavigate,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [coachingData, setCoachingData] = useState<SmtCoachingRecord>(() => 
+    smt ? getCoachingRecord(smt.nip) : {
+      nip: '',
+      checkedMonths: { jan: false, feb: false, mar: false, apr: false, may: false, jun: false, jul: false },
+      customLogs: [],
+      totalCount: 0,
+    }
+  );
+
+  const [newTopic, setNewTopic] = useState('');
+  const [newNotes, setNewNotes] = useState('');
+  const [showAddLog, setShowAddLog] = useState(false);
+
+  useEffect(() => {
+    if (smt) {
+      setCoachingData(getCoachingRecord(smt.nip));
+      const unsubscribe = subscribeToCoachingUpdates(() => {
+        setCoachingData(getCoachingRecord(smt.nip));
+      });
+      return unsubscribe;
+    }
+  }, [smt?.nip]);
 
   if (!smt) return null;
+
+  const handleToggleMonth = (monthKey: MonthKey) => {
+    const updated = toggleMonthCoaching(smt.nip, monthKey);
+    setCoachingData({ ...updated });
+    if (updated.checkedMonths[monthKey]) {
+      confetti({
+        particleCount: 35,
+        spread: 40,
+        origin: { y: 0.7 },
+        colors: ['#06D6A0', '#FFE600', '#118AB2']
+      });
+    }
+  };
+
+  const handleAddLog = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTopic.trim()) return;
+    const updated = addCustomCoachingLog(smt.nip, newTopic.trim(), newNotes.trim());
+    setCoachingData({ ...updated });
+    setNewTopic('');
+    setNewNotes('');
+    setShowAddLog(false);
+    confetti({
+      particleCount: 45,
+      spread: 50,
+      origin: { y: 0.7 },
+      colors: ['#FFE600', '#FF3E83', '#06D6A0']
+    });
+  };
+
+  const handleRemoveLog = (logId: string) => {
+    const updated = removeCustomCoachingLog(smt.nip, logId);
+    setCoachingData({ ...updated });
+  };
 
   const triggerConfetti = () => {
     confetti({
@@ -316,6 +386,280 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Section: Historical SP & Kedisiplinan Karyawan */}
+          <div className="bg-white border-3 border-black rounded-3xl p-5 bento-shadow">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b-2 border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-[#FF3E83] text-white border-2 border-black flex items-center justify-center font-black text-sm">
+                  ⚠️
+                </span>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black font-display text-black uppercase">
+                    Riwayat & Status Surat Peringatan (SP)
+                  </h3>
+                  <p className="text-[11px] font-bold text-gray-500">
+                    Audit kepatuhan dan catatan disiplin berdasarkan NIP ({smt.nip})
+                  </p>
+                </div>
+              </div>
+
+              {smt.spList && smt.spList.length > 0 ? (
+                <span className="bg-[#FF3E83] text-white font-black text-xs px-3 py-1 rounded-full border-2 border-black uppercase flex items-center gap-1">
+                  🚨 Ada {smt.spList.length} Catatan SP
+                </span>
+              ) : (
+                <span className="bg-[#06D6A0] text-black font-black text-xs px-3 py-1 rounded-full border-2 border-black uppercase flex items-center gap-1">
+                  ✨ Bersih (Tidak Ada SP)
+                </span>
+              )}
+            </div>
+
+            {smt.spList && smt.spList.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {smt.spList.map((sp) => (
+                    <div
+                      key={sp.id}
+                      className="border-2 border-black rounded-2xl p-3.5 bg-yellow-50/70 shadow-[2px_2px_0px_0px_#000] flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-lg border border-black font-black text-xs uppercase ${
+                              sp.spType === 'S2' ? 'bg-[#FF3E83] text-white' : 'bg-[#FFE600] text-black'
+                            }`}
+                          >
+                            {sp.spLabel}
+                          </span>
+                          <span
+                            className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                              sp.status === 'AKTIF'
+                                ? 'bg-amber-200 text-amber-950 border-amber-500'
+                                : 'bg-gray-200 text-gray-700 border-gray-400'
+                            }`}
+                          >
+                            {sp.status === 'AKTIF' ? `⏳ AKTIF (${sp.remainingDays} Hari Lagi)` : '✅ EXPIRED'}
+                          </span>
+                        </div>
+
+                        <div className="bg-white border border-black rounded-xl p-2.5 text-xs space-y-1 my-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500 font-bold">Mulai Berlaku:</span>
+                            <span className="font-black text-black">{sp.startDate}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500 font-bold">Berakhir Pada:</span>
+                            <span className="font-black text-black">{sp.expiredDate}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] font-semibold text-gray-600 italic">
+                        *Masa sanksi 6 bulan kalender. Tetap jaga performa target sales dan derivatif.
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#F8F9FA] border-2 border-dashed border-gray-300 rounded-2xl p-4 text-center">
+                <p className="text-xs font-extrabold text-emerald-700 flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Karyawan ini memiliki catatan kedisiplinan prima tanpa pelanggaran SP di Store Alsut.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Section: Interactive Coaching Checklist & SMT Coaching Logs */}
+          <div className="bg-white border-3 border-black rounded-3xl p-5 bento-shadow">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b-2 border-gray-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-[#FFE600] border-2 border-black flex items-center justify-center text-xl shadow-[2px_2px_0px_0px_#000]">
+                  🎯
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black font-display text-black uppercase">
+                    Lembar Checklist & Histori Coaching SMT
+                  </h3>
+                  <p className="text-[11px] font-bold text-gray-500">
+                    Catatan pembinaan 1-on-1 SPV/Manager untuk target sales, FP, Clean Care & kedisiplinan
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`font-black text-xs px-3 py-1.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_#000] flex items-center gap-1.5 ${
+                  coachingData.totalCount > 0 ? 'bg-[#06D6A0] text-black' : 'bg-[#FF3E83] text-white'
+                }`}>
+                  <UserCheck className="w-4 h-4" />
+                  <span>Total Dicoaching: {coachingData.totalCount}x Sesi</span>
+                </span>
+                
+                <button
+                  type="button"
+                  onClick={() => setShowAddLog(!showAddLog)}
+                  className="px-3 py-1.5 bg-[#A78BFA] hover:bg-purple-300 text-purple-950 font-black text-xs rounded-xl border-2 border-black flex items-center gap-1 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>{showAddLog ? 'Tutup Form' : '+ Catat Sesi Baru'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Form to Add Custom Coaching Session */}
+            {showAddLog && (
+              <form onSubmit={handleAddLog} className="mb-4 bg-[#F0F2F5] border-2 border-black rounded-2xl p-4 shadow-[2px_2px_0px_0px_#000] animate-in fade-in duration-150">
+                <h4 className="text-xs font-black uppercase text-black mb-2 flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+                  Tambah Catatan Coaching SMT Baru
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-600 block mb-1">
+                      Topik / Fokus Pembinaan *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Misal: Review Target Furnipro & Closing Care"
+                      value={newTopic}
+                      onChange={(e) => setNewTopic(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs font-semibold bg-white border-2 border-black rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE600]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-600 block mb-1">
+                      Catatan & Komitmen Tindak Lanjut SMT
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Misal: SMT berjanji follow-up 5 customer per shift"
+                      value={newNotes}
+                      onChange={(e) => setNewNotes(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs font-semibold bg-white border-2 border-black rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE600]"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddLog(false)}
+                    className="px-3 py-1 bg-white hover:bg-gray-100 text-black border-2 border-black rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1 bg-black hover:bg-gray-800 text-[#FFE600] border-2 border-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_0px_#FFE600]"
+                  >
+                    Simpan Catatan Coaching 💾
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* 7-Month Interactive Checklist Cards */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-black uppercase tracking-wider text-gray-600">
+                  Centang Evaluasi Bulanan (Klik Kotak untuk Centang):
+                </span>
+                <span className="text-[11px] font-bold text-gray-500">
+                  Tercentang:{' '}
+                  <strong className="text-black font-black">
+                    {Object.values(coachingData.checkedMonths).filter(Boolean).length}/7 Bulan
+                  </strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                {MONTH_CONFIGS.map((m) => {
+                  const isChecked = !!coachingData.checkedMonths[m.key];
+                  const mData = smt.monthly[m.key];
+                  return (
+                    <div
+                      key={m.key}
+                      onClick={() => handleToggleMonth(m.key)}
+                      className={`border-2 border-black rounded-2xl p-2.5 cursor-pointer transition-all hover:scale-102 flex flex-col justify-between select-none ${
+                        isChecked
+                          ? 'bg-[#FFE600] shadow-[2px_2px_0px_0px_#000]'
+                          : 'bg-[#F8F9FA] hover:bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1.5">
+                        <span className="text-xs font-black uppercase">
+                          {m.short}
+                        </span>
+                        <div className="w-5 h-5 rounded-md border-2 border-black flex items-center justify-center bg-white shadow-[1px_1px_0px_0px_#000]">
+                          {isChecked ? (
+                            <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] space-y-0.5 pt-1 border-t border-black/20">
+                        <div className="flex justify-between font-bold">
+                          <span>Sales:</span>
+                          <span className="font-black text-black">{mData.rawSales}</span>
+                        </div>
+                        <p className="text-[9px] font-black uppercase text-center mt-1 py-0.5 rounded bg-black/10">
+                          {isChecked ? '✅ Coached' : '⏳ Belum'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Log List (If Any) */}
+            {coachingData.customLogs && coachingData.customLogs.length > 0 && (
+              <div className="mt-3 pt-3 border-t-2 border-gray-200">
+                <h4 className="text-xs font-black uppercase text-gray-700 mb-2">
+                  Riwayat Sesi Coaching Tambahan ({coachingData.customLogs.length} Catatan):
+                </h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {coachingData.customLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="bg-purple-50/80 border-2 border-purple-300 rounded-xl p-2.5 flex items-start justify-between gap-2 text-xs shadow-sm"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                          <span className="font-black text-purple-900 bg-purple-200 px-2 py-0.2 rounded text-[10px]">
+                            {log.topic}
+                          </span>
+                          <span className="text-[10px] font-semibold text-gray-500">
+                            📅 {log.date}
+                          </span>
+                          {log.coachName && (
+                            <span className="text-[10px] font-bold text-purple-700">
+                              👤 {log.coachName}
+                            </span>
+                          )}
+                        </div>
+                        {log.notes && (
+                          <p className="text-[11px] text-gray-700 font-medium italic mt-0.5">
+                            "{log.notes}"
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLog(log.id)}
+                        title="Hapus sesi coaching ini"
+                        className="text-gray-400 hover:text-red-600 p-1 cursor-pointer transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Verdict and Coaching Action Plan */}
