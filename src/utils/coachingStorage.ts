@@ -50,7 +50,10 @@ let memoryStorage: Record<string, SmtCoachingRecord> = {};
 // Custom event for cross-component reactive updates
 const COACHING_UPDATE_EVENT = 'alsut_coaching_updated';
 
-export const ALL_MONTH_KEYS: MonthKey[] = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul'];
+export const ALL_MONTH_KEYS: MonthKey[] = [
+  'jan', 'feb', 'mar', 'apr', 'may', 'jun', 
+  'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+];
 
 export const getDefaultWeeks = (): MonthlyWeekChecks => ({
   w1: false,
@@ -59,38 +62,26 @@ export const getDefaultWeeks = (): MonthlyWeekChecks => ({
   w4: false,
 });
 
-export const getDefaultRecord = (nip: string): SmtCoachingRecord => ({
-  nip,
-  checkedWeeks: {
-    jan: getDefaultWeeks(),
-    feb: getDefaultWeeks(),
-    mar: getDefaultWeeks(),
-    apr: getDefaultWeeks(),
-    may: getDefaultWeeks(),
-    jun: getDefaultWeeks(),
-    jul: getDefaultWeeks(),
-  },
-  checkedFurniproWeeks: {
-    jan: getDefaultWeeks(),
-    feb: getDefaultWeeks(),
-    mar: getDefaultWeeks(),
-    apr: getDefaultWeeks(),
-    may: getDefaultWeeks(),
-    jun: getDefaultWeeks(),
-    jul: getDefaultWeeks(),
-  },
-  checkedComserWeeks: {
-    jan: getDefaultWeeks(),
-    feb: getDefaultWeeks(),
-    mar: getDefaultWeeks(),
-    apr: getDefaultWeeks(),
-    may: getDefaultWeeks(),
-    jun: getDefaultWeeks(),
-    jul: getDefaultWeeks(),
-  },
-  customLogs: [],
-  totalCount: 0,
-});
+export const getDefaultRecord = (nip: string): SmtCoachingRecord => {
+  const checkedWeeks = {} as Record<MonthKey, MonthlyWeekChecks>;
+  const checkedFurniproWeeks = {} as Record<MonthKey, MonthlyWeekChecks>;
+  const checkedComserWeeks = {} as Record<MonthKey, MonthlyWeekChecks>;
+
+  ALL_MONTH_KEYS.forEach((m) => {
+    checkedWeeks[m] = getDefaultWeeks();
+    checkedFurniproWeeks[m] = getDefaultWeeks();
+    checkedComserWeeks[m] = getDefaultWeeks();
+  });
+
+  return {
+    nip,
+    checkedWeeks,
+    checkedFurniproWeeks,
+    checkedComserWeeks,
+    customLogs: [],
+    totalCount: 0,
+  };
+};
 
 const calculateTotal = (record: SmtCoachingRecord): number => {
   let sessionWeeks = 0;

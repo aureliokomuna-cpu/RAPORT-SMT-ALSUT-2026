@@ -2,7 +2,29 @@ import Papa from 'papaparse';
 import { GradeLevel, MonthConfig, MonthKey, MonthlyMetric, SmtRecord, SpRecord, ZoneSummary } from '../types';
 import { cleanNip } from './searchHelper';
 
-export const MONTH_CONFIGS: MonthConfig[] = [
+export interface MonthDefinition {
+  key: MonthKey;
+  name: string;
+  short: string;
+  aliases: string[];
+}
+
+export const ALL_MONTH_DEFINITIONS: MonthDefinition[] = [
+  { key: 'jan', name: 'Januari', short: 'JAN', aliases: ['JAN', 'JANUARI', 'JANUARY'] },
+  { key: 'feb', name: 'Februari', short: 'FEB', aliases: ['FEB', 'FEBRUARI', 'FEBRUARY'] },
+  { key: 'mar', name: 'Maret', short: 'MAR', aliases: ['MAR', 'MARET', 'MARCH'] },
+  { key: 'apr', name: 'April', short: 'APR', aliases: ['APR', 'APRIL'] },
+  { key: 'may', name: 'Mei', short: 'MAY', aliases: ['MAY', 'MEI'] },
+  { key: 'jun', name: 'Juni', short: 'JUN', aliases: ['JUN', 'JUNI', 'JUNE'] },
+  { key: 'jul', name: 'Juli', short: 'JUL', aliases: ['JUL', 'JULI', 'JULY'] },
+  { key: 'aug', name: 'Agustus', short: 'AUG', aliases: ['AUG', 'AGU', 'AGUSTUS', 'AUGUST'] },
+  { key: 'sep', name: 'September', short: 'SEP', aliases: ['SEP', 'SEPTEMBER'] },
+  { key: 'oct', name: 'Oktober', short: 'OCT', aliases: ['OCT', 'OKT', 'OKTOBER', 'OCTOBER'] },
+  { key: 'nov', name: 'November', short: 'NOV', aliases: ['NOV', 'NOVEMBER'] },
+  { key: 'dec', name: 'Desember', short: 'DEC', aliases: ['DEC', 'DES', 'DESEMBER', 'DECEMBER'] },
+];
+
+export let MONTH_CONFIGS: MonthConfig[] = [
   { key: 'jan', name: 'Januari', short: 'JAN', salesIdx: 3, fpIdx: 4, ccIdx: 5 },
   { key: 'feb', name: 'Februari', short: 'FEB', salesIdx: 7, fpIdx: 8, ccIdx: 9 },
   { key: 'mar', name: 'Maret', short: 'MAR', salesIdx: 11, fpIdx: 12, ccIdx: 13 },
@@ -10,6 +32,7 @@ export const MONTH_CONFIGS: MonthConfig[] = [
   { key: 'may', name: 'Mei', short: 'MAY', salesIdx: 19, fpIdx: 20, ccIdx: 21 },
   { key: 'jun', name: 'Juni', short: 'JUN', salesIdx: 23, fpIdx: 24, ccIdx: 25 },
   { key: 'jul', name: 'Juli', short: 'JUL', salesIdx: 27, fpIdx: 28, ccIdx: 29 },
+  { key: 'aug', name: 'Agustus', short: 'AUG', salesIdx: 31, fpIdx: 32, ccIdx: 33 },
 ];
 
 export function parsePercentage(str?: string | null): number {
@@ -270,6 +293,84 @@ export function parseSmtCsv(csvText: string, spRecords: SpRecord[] = []): SmtRec
   const rawRows = parsed.data;
   if (!rawRows || rawRows.length < 3) return [];
 
+  const r0 = rawRows[0] || [];
+  const r1 = rawRows[1] || [];
+
+  // Dynamically detect which months are present in Row 0 or Row 1 headers
+  const detectedConfigs: MonthConfig[] = [];
+  
+  for (let c = 0; c < r0.length; c++) {
+    const val0 = (r0[c] || '').trim().toUpperCase();
+    for (const def of ALL_MONTH_DEFINITIONS) {
+      if (def.aliases.some((alias) => val0 === alias || val0.startsWith(alias))) {
+        if (!detectedConfigs.some((dc) => dc.key === def.key)) {
+          detectedConfigs.push({
+            key: def.key,
+            name: def.name,
+            short: def.short,
+            salesIdx: c,
+            fpIdx: c + 1,
+            ccIdx: c + 2,
+          });
+        }
+        break;
+      }
+    }
+  }
+
+  // Update global MONTH_CONFIGS if dynamic months are detected
+  if (detectedConfigs.length > 0) {
+    MONTH_CONFIGS = detectedConfigs;
+  }
+
+  // Dynamically detect YTD columns
+  let ytdSalesIdx = -1;
+  let ytdPolisIdx = -1;
+  let ytdComserIdx = -1;
+  let salesAchIdx = -1;
+  let fpAchIdx = -1;
+  let ccAchIdx = -1;
+  let evalResultIdx = -1;
+
+  for (let c = 0; c < r1.length; c++) {
+    const text1 = (r1[c] || '').trim().toUpperCase();
+    const text0 = (r0[c] || '').trim().toUpperCase();
+
+    if (ytdSalesIdx === -1 && (text1.startsWith('YTD') || text0 === 'YTD')) {
+      ytdSalesIdx = c;
+    }
+    if (text1.includes('POLIS') || text1.includes('YTD FP') || text1.includes('YTD POLIS')) {
+      ytdPolisIdx = c;
+    }
+    if (text1.includes('COMSER') || text1.includes('YTD C&C') || text1.includes('YTD COMSER')) {
+      ytdComserIdx = c;
+    }
+    if (text1.includes('SALES ACH')) {
+      salesAchIdx = c;
+    }
+    if (text1.includes('FURNIPRO') || text1.includes('FP ACH')) {
+      fpAchIdx = c;
+    }
+    if (text1.includes('COMMSER') || text1.includes('C&C ACH') || text1.includes('COMSER ACH')) {
+      ccAchIdx = c;
+    }
+    if (text1.includes('EVALUATION') || text1.includes('HASIL EVALUASI')) {
+      evalResultIdx = c;
+    }
+  }
+
+  // Fallback offsets relative to the last detected month if not found by exact header text
+  const lastMonthConfig = MONTH_CONFIGS[MONTH_CONFIGS.length - 1];
+  const defaultYtdBase = lastMonthConfig ? lastMonthConfig.ccIdx + 2 : 35;
+
+  if (ytdSalesIdx === -1) ytdSalesIdx = defaultYtdBase;
+  if (ytdPolisIdx === -1) ytdPolisIdx = ytdSalesIdx + 1;
+  if (ytdComserIdx === -1) ytdComserIdx = ytdSalesIdx + 2;
+  if (salesAchIdx === -1) salesAchIdx = ytdSalesIdx + 3;
+  if (fpAchIdx === -1) fpAchIdx = ytdSalesIdx + 4;
+  if (ccAchIdx === -1) ccAchIdx = ytdSalesIdx + 5;
+  if (evalResultIdx === -1) evalResultIdx = ytdSalesIdx + 6;
+
   // Skip header rows (0 and 1)
   const dataRows = rawRows.slice(2);
   const smtList: SmtRecord[] = [];
@@ -282,6 +383,29 @@ export function parseSmtCsv(csvText: string, spRecords: SpRecord[] = []): SmtRec
     const zone = (r[0] || 'GENERAL').trim();
 
     const monthly = {} as Record<MonthKey, MonthlyMetric>;
+
+    // Initialize all 12 canonical months with default values first
+    ALL_MONTH_DEFINITIONS.forEach((def) => {
+      monthly[def.key] = {
+        monthKey: def.key,
+        monthName: def.name,
+        monthShort: def.short,
+        rawSales: '0%',
+        salesPct: 0,
+        rawFp: '0',
+        fpCount: 0,
+        rawCc: 'Rp0',
+        ccVal: 0,
+        grade: 'F',
+        vibe: 'Belum Ada Data ⏳',
+        badge: 'Upcoming',
+        color: '#9CA3AF',
+        isAchieved: false,
+        comment: 'Data bulan ini belum dimulai / belum diinput.',
+      };
+    });
+
+    // Populate active detected months
     MONTH_CONFIGS.forEach((m) => {
       const rawSales = (r[m.salesIdx] || '').trim();
       const rawFp = (r[m.fpIdx] || '').trim();
@@ -312,18 +436,18 @@ export function parseSmtCsv(csvText: string, spRecords: SpRecord[] = []): SmtRec
       };
     });
 
-    const rawYtdSales = (r[31] || '').trim();
-    const rawYtdPolis = (r[32] || '').trim();
-    const rawYtdComser = (r[33] || '').trim();
+    const rawYtdSales = (r[ytdSalesIdx] || '').trim();
+    const rawYtdPolis = (r[ytdPolisIdx] || '').trim();
+    const rawYtdComser = (r[ytdComserIdx] || '').trim();
 
     const ytdSalesPct = parsePercentage(rawYtdSales);
     const ytdPolisCount = parseCount(rawYtdPolis);
     const ytdComserVal = parseRupiah(rawYtdComser);
 
-    const salesAchCount = parseCount(r[34]);
-    const furniproAchCount = parseCount(r[35]);
-    const commserAchCount = parseCount(r[36]);
-    const evaluationResult = (r[37] || 'SMT DALAM PANTAUAN').trim();
+    const salesAchCount = parseCount(r[salesAchIdx]);
+    const furniproAchCount = parseCount(r[fpAchIdx]);
+    const commserAchCount = parseCount(r[ccAchIdx]);
+    const evaluationResult = (r[evalResultIdx] || 'SMT DALAM PANTAUAN').trim();
 
     // Determine overall grade
     let overallGrade: GradeLevel = 'C';
@@ -405,11 +529,11 @@ export function parseSmtCsv(csvText: string, spRecords: SpRecord[] = []): SmtRec
   // Calculate Month-by-Month Ranks
   MONTH_CONFIGS.forEach((m) => {
     const sortedByMonth = [...smtList].sort(
-      (a, b) => b.monthly[m.key].salesPct - a.monthly[m.key].salesPct
+      (a, b) => (b.monthly[m.key]?.salesPct || 0) - (a.monthly[m.key]?.salesPct || 0)
     );
     sortedByMonth.forEach((smt, rIdx) => {
       const original = smtList.find((s) => s.id === smt.id);
-      if (original) {
+      if (original && original.monthly[m.key]) {
         original.monthly[m.key].rankInMonth = rIdx + 1;
       }
     });

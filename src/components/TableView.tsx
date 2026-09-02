@@ -74,13 +74,7 @@ export const TableView: React.FC<TableViewProps> = ({
       'Zona',
       'NIP',
       'Nama SMT',
-      'Jan Sales',
-      'Feb Sales',
-      'Mar Sales',
-      'Apr Sales',
-      'Mei Sales',
-      'Jun Sales',
-      'Jul Sales',
+      ...MONTH_CONFIGS.map((m) => `${m.short} Sales`),
       'YTD Sales %',
       'YTD Polis FP',
       'YTD Clean & Care',
@@ -96,17 +90,11 @@ export const TableView: React.FC<TableViewProps> = ({
         `"${s.zone}"`,
         `"${s.nip}"`,
         `"${s.nama}"`,
-        `"${s.monthly.jan.rawSales}"`,
-        `"${s.monthly.feb.rawSales}"`,
-        `"${s.monthly.mar.rawSales}"`,
-        `"${s.monthly.apr.rawSales}"`,
-        `"${s.monthly.may.rawSales}"`,
-        `"${s.monthly.jun.rawSales}"`,
-        `"${s.monthly.jul.rawSales}"`,
+        ...MONTH_CONFIGS.map((m) => `"${s.monthly[m.key]?.rawSales || '0%'}"`),
         `"${s.ytd.rawSales}"`,
         s.ytd.polisCount,
         `"${s.ytd.rawComser}"`,
-        `${s.ytd.salesAchCount}/7`,
+        `${s.ytd.salesAchCount}/${MONTH_CONFIGS.length}`,
         `${coachRec.totalCount || 0} Minggu`,
         `"${s.ytd.evaluationResult}"`,
       ];
@@ -262,7 +250,7 @@ export const TableView: React.FC<TableViewProps> = ({
                   </td>
                   <td className="py-2.5 px-2 text-center font-black border-r border-gray-200">
                     <span className="bg-gray-100 border border-black/40 px-1.5 py-0.5 rounded text-[11px]">
-                      {s.ytd.salesAchCount}/7
+                      {s.ytd.salesAchCount}/{MONTH_CONFIGS.length}
                     </span>
                   </td>
                   

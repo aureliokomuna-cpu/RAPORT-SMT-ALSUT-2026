@@ -46,23 +46,41 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   const totalPolis = smtList.reduce((sum, s) => sum + s.ytd.polisCount, 0);
   const totalComser = smtList.reduce((sum, s) => sum + s.ytd.comserVal, 0);
 
-  // Compute Store-wide Monthly Average Sales Productivity (Jan - Jul)
+  // Compute Store-wide Monthly Average Sales Productivity
   const monthlyAverages = MONTH_CONFIGS.map((m) => {
     const validSmts = smtList.filter((s) => s.monthly[m.key] && s.monthly[m.key].salesPct > 0);
-    const avg = validSmts.length > 0 
+    const avgSalesPct = validSmts.length > 0 
       ? validSmts.reduce((acc, s) => acc + s.monthly[m.key].salesPct, 0) / validSmts.length
       : 0;
+    const totalFp = smtList.reduce((acc, s) => acc + (s.monthly[m.key]?.fpCount || 0), 0);
+    const avgFpPerSmt = totalSmt > 0 ? totalFp / totalSmt : 0;
+    const totalCc = smtList.reduce((acc, s) => acc + (s.monthly[m.key]?.ccVal || 0), 0);
+    const avgCcPerSmt = totalSmt > 0 ? totalCc / totalSmt : 0;
     const achievedCount = smtList.filter((s) => s.monthly[m.key]?.isAchieved).length;
+
     return {
       ...m,
-      avgSalesPct: avg,
+      avgSalesPct,
+      totalFp,
+      avgFpPerSmt,
+      totalCc,
+      avgCcPerSmt,
       achievedCount,
       achievedPct: totalSmt > 0 ? (achievedCount / totalSmt) * 100 : 0,
     };
   });
 
-  const overallMonthlyAvg =
-    monthlyAverages.reduce((sum, m) => sum + m.avgSalesPct, 0) / (monthlyAverages.length || 1);
+  const monthsCount = monthlyAverages.length || 1;
+  const overallMonthlyAvgSales =
+    monthlyAverages.reduce((sum, m) => sum + m.avgSalesPct, 0) / monthsCount;
+  const overallMonthlyAvgFpPerSmt =
+    monthlyAverages.reduce((sum, m) => sum + m.avgFpPerSmt, 0) / monthsCount;
+  const overallMonthlyAvgCcPerSmt =
+    monthlyAverages.reduce((sum, m) => sum + m.avgCcPerSmt, 0) / monthsCount;
+  const overallMonthlyTotalFp =
+    monthlyAverages.reduce((sum, m) => sum + m.totalFp, 0) / monthsCount;
+  const overallMonthlyTotalCc =
+    monthlyAverages.reduce((sum, m) => sum + m.totalCc, 0) / monthsCount;
 
   const highestMonth = [...monthlyAverages].sort((a, b) => b.avgSalesPct - a.avgSalesPct)[0];
 
@@ -102,50 +120,61 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           </div>
         </div>
 
-        {/* Card 2: 📈 Average Jualan SMT per Bulan (Produktifitas SMT) (Span 4) */}
+        {/* Card 2: 📈 Average Jualan SMT per Bulan (Produktifitas SMT: % & VALUES) (Span 4) */}
         <div className="lg:col-span-4 bg-white border-3 border-black rounded-3xl p-5 bento-shadow relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-start mb-2">
               <span className="bg-[#FF3E83] text-white px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider border border-black shadow-[1px_1px_0px_0px_#000] flex items-center gap-1">
-                <BarChart3 className="w-3 h-3" /> Produktifitas SMT
+                <BarChart3 className="w-3 h-3" /> Produktifitas SMT / Bulan
               </span>
               <span className="text-[10px] font-black bg-black text-[#FFE600] px-2 py-0.5 rounded-md">
-                7 Bulan S1
+                {MONTH_CONFIGS.length} Bulan Aktif
               </span>
             </div>
 
-            <div className="flex items-baseline justify-between gap-2 mt-1">
+            {/* Top Primary Productivity Figures: Sales %, FP Count, & C&C Rupiah */}
+            <div className="grid grid-cols-3 gap-2 mt-2 bg-[#F8F9FA] border-2 border-black rounded-2xl p-2.5">
               <div>
-                <p className="text-[10px] font-bold uppercase text-gray-500">Rata-rata Sales / Bulan</p>
-                <h3 className="text-3xl sm:text-4xl font-black font-display text-black tracking-tight leading-none mt-0.5">
-                  {formatPct(overallMonthlyAvg)}
-                </h3>
+                <p className="text-[9px] font-extrabold uppercase text-gray-500 leading-none">Rata Sales</p>
+                <p className="text-lg sm:text-xl font-black font-display text-black mt-1 leading-none">
+                  {formatPct(overallMonthlyAvgSales)}
+                </p>
+                <span className="text-[8px] font-bold text-emerald-700 block mt-0.5">Target 100%</span>
+              </div>
+              <div className="border-x border-gray-300 px-1.5 text-center">
+                <p className="text-[9px] font-extrabold uppercase text-gray-500 leading-none">Rata Polis FP</p>
+                <p className="text-lg sm:text-xl font-black font-display text-indigo-700 mt-1 leading-none">
+                  {overallMonthlyAvgFpPerSmt.toFixed(1)}
+                </p>
+                <span className="text-[8px] font-bold text-gray-500 block mt-0.5">Polis / SMT</span>
               </div>
               <div className="text-right">
-                <span className="inline-block text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-400 px-2 py-0.5 rounded-lg">
-                  Peak: {highestMonth ? `${highestMonth.short} (${formatPct(highestMonth.avgSalesPct)})` : '-'}
-                </span>
+                <p className="text-[9px] font-extrabold uppercase text-gray-500 leading-none">Rata Clean&Care</p>
+                <p className="text-base sm:text-lg font-black font-display text-emerald-700 mt-1 leading-none truncate">
+                  {formatCompactRupiah(overallMonthlyAvgCcPerSmt)}
+                </p>
+                <span className="text-[8px] font-bold text-gray-500 block mt-0.5">Rp / SMT</span>
               </div>
             </div>
           </div>
 
-          {/* Monthly Mini Bar Indicators (JAN - JUL) */}
+          {/* Monthly Mini Bar Indicators with % AND Values */}
           <div className="mt-3 pt-2.5 border-t-2 border-gray-200">
             <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 mb-1.5">
-              <span>Trend Produktifitas SMT:</span>
-              <span className="text-black font-black">Store Avg/Bulan</span>
+              <span>Rincian Nilai & % per Bulan:</span>
+              <span className="text-black font-black text-[9px]">Sales% • FP • C&C (Rp)</span>
             </div>
             
-            <div className="grid grid-cols-7 gap-1">
+            <div className={`grid grid-cols-${Math.min(8, monthlyAverages.length)} gap-1`}>
               {monthlyAverages.map((m) => {
                 const isOver100 = m.avgSalesPct >= 100;
                 return (
                   <div
                     key={m.key}
-                    title={`${m.name}: Rata-rata SMT ${formatPct(m.avgSalesPct)} (${m.achievedCount}/${totalSmt} SMT Lolos Target)`}
-                    className="flex flex-col items-center bg-gray-50 border border-black/40 rounded-xl p-1 text-center hover:bg-yellow-50 transition-colors"
+                    title={`${m.name}:\n• Rata-rata Sales: ${formatPct(m.avgSalesPct)}\n• Rata-rata Polis FP: ${m.avgFpPerSmt.toFixed(1)} Polis (Total: ${m.totalFp} Polis)\n• Rata-rata C&C: ${formatCompactRupiah(m.avgCcPerSmt)} (Total: ${formatCompactRupiah(m.totalCc)})\n• Lolos Target: ${m.achievedCount}/${totalSmt} SMT`}
+                    className="flex flex-col items-center bg-gray-50 border border-black/40 rounded-xl p-1 text-center hover:bg-yellow-100 hover:scale-105 transition-all cursor-pointer shadow-[1px_1px_0px_0px_#000]"
                   >
-                    <span className="text-[9px] font-black text-gray-500 leading-none">
+                    <span className="text-[9px] font-black text-gray-700 leading-none">
                       {m.short}
                     </span>
                     <span className={`text-[10px] font-black leading-tight my-0.5 ${
@@ -153,10 +182,11 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                     }`}>
                       {Math.round(m.avgSalesPct)}%
                     </span>
-                    <span className={`text-[8px] font-black px-1 py-0.2 rounded leading-none ${
-                      isOver100 ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'
-                    }`}>
-                      {m.achievedCount}👥
+                    <span className="text-[8px] font-extrabold text-indigo-800 leading-none truncate w-full">
+                      {m.avgFpPerSmt.toFixed(0)}p
+                    </span>
+                    <span className="text-[7.5px] font-bold text-emerald-800 leading-none truncate w-full mt-0.5">
+                      {formatCompactRupiah(m.avgCcPerSmt)}
                     </span>
                   </div>
                 );
@@ -165,8 +195,8 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           </div>
 
           <div className="mt-2 text-[10px] font-extrabold text-gray-500 flex items-center justify-between">
-            <span>Standar Target: 100%</span>
-            <span className="text-black font-black">7 Bulan Terhitung ✨</span>
+            <span className="text-gray-600">Store Avg: <strong className="text-indigo-800">{Math.round(overallMonthlyTotalFp)} FP</strong> • <strong className="text-emerald-800">{formatCompactRupiah(overallMonthlyTotalCc)} C&C</strong></span>
+            <span className="text-black font-black">Rata-rata/Bulan ✨</span>
           </div>
         </div>
 

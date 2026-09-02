@@ -165,24 +165,32 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
           </div>
         </div>
 
-        {/* Mini 7-Month Bento Grid: JAN -> JUL */}
+        {/* Mini Month Bento Grid: Dynamic for all active months */}
         <div className="bg-[#F8F9FA] border-2 border-black rounded-2xl p-2.5 mb-3.5">
           <div className="flex items-center justify-between mb-1.5 px-0.5">
             <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
-              Performa Tiap Bulan (SMT 1)
+              Performa Tiap Bulan
             </span>
             <span className="text-[10px] font-bold text-gray-600">
-              Achieved: <strong className="text-black font-black">{smt.ytd.salesAchCount}/7</strong> Bulan
+              Achieved: <strong className="text-black font-black">{smt.ytd.salesAchCount}/{MONTH_CONFIGS.length}</strong> Bulan
             </span>
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className={`grid grid-cols-${Math.min(8, MONTH_CONFIGS.length)} gap-1`}>
             {MONTH_CONFIGS.map((m) => {
-              const monthData = smt.monthly[m.key];
+              const monthData = smt.monthly[m.key] || {
+                salesPct: 0,
+                rawSales: '0%',
+                fpCount: 0,
+                ccVal: 0,
+                grade: 'F',
+                vibe: '-',
+                isAchieved: false
+              };
               return (
                 <div
                   key={m.key}
-                  title={`${m.name}: ${monthData.rawSales} (Grade ${monthData.grade} - ${monthData.vibe})`}
+                  title={`${m.name}:\n• Sales: ${monthData.rawSales} (Grade ${monthData.grade})\n• Furnipro: ${monthData.fpCount} Polis\n• Clean & Care: ${formatCompactRupiah(monthData.ccVal)}`}
                   className={`border border-black rounded-xl p-1 text-center flex flex-col justify-between transition-transform hover:scale-105 ${
                     monthData.isAchieved ? 'bg-white shadow-[1px_1px_0px_0px_#000]' : 'bg-gray-100/70'
                   }`}
@@ -206,7 +214,7 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
           </div>
         </div>
 
-        {/* Primary YTD Metrics Bar */}
+        {/* Primary YTD Metrics Bar with Monthly Average Values */}
         <div className="space-y-2 mb-3.5">
           <div className="bg-[#F0F2F5] border-2 border-black rounded-2xl p-3 flex items-center justify-between">
             <div>
@@ -220,10 +228,13 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
 
             <div className="text-right flex flex-col items-end">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                Polis FP & Comser
+                Total & Rata-rata / Bulan
               </span>
               <p className="text-xs font-black text-black mt-0.5">
                 🛡️ {smt.ytd.polisCount} Polis • 🫧 {formatCompactRupiah(smt.ytd.comserVal)}
+              </p>
+              <p className="text-[10px] font-extrabold text-indigo-900 mt-0.5">
+                Rata: {(smt.ytd.polisCount / (MONTH_CONFIGS.length || 1)).toFixed(1)} FP/bln • {formatCompactRupiah(smt.ytd.comserVal / (MONTH_CONFIGS.length || 1))}/bln
               </p>
             </div>
           </div>

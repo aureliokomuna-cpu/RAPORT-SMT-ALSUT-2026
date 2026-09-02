@@ -75,7 +75,9 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
   const [newTopic, setNewTopic] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newLetterNumber, setNewLetterNumber] = useState('');
-  const [selectedMonthForLog, setSelectedMonthForLog] = useState<MonthKey>('jul');
+  const [selectedMonthForLog, setSelectedMonthForLog] = useState<MonthKey>(() => 
+    MONTH_CONFIGS[MONTH_CONFIGS.length - 1]?.key || 'aug'
+  );
   const [selectedWeekForLog, setSelectedWeekForLog] = useState<WeekKey>('w1');
   const [checkSalesInForm, setCheckSalesInForm] = useState(true);
   const [checkFurniproInForm, setCheckFurniproInForm] = useState(true);
@@ -256,9 +258,9 @@ Nama: ${smt.nama} (NIP: ${smt.nip})
 Zona: ${smt.zone}
 Rank Toko: #${smt.ytd.rank}
 Total Sales: ${smt.ytd.rawSales} (${formatPct(smt.ytd.salesPct)} Target)
-Total Polis FP: ${smt.ytd.polisCount} Polis
-Total Clean & Care: ${smt.ytd.rawComser}
-Bulan Achieve Sales: ${smt.ytd.salesAchCount}/7 Bulan
+Total Polis FP: ${smt.ytd.polisCount} Polis (Rata: ${(smt.ytd.polisCount / (MONTH_CONFIGS.length || 1)).toFixed(1)} Polis/bln)
+Total Clean & Care: ${smt.ytd.rawComser} (Rata: ${formatCompactRupiah(smt.ytd.comserVal / (MONTH_CONFIGS.length || 1))}/bln)
+Bulan Achieve Sales: ${smt.ytd.salesAchCount}/${MONTH_CONFIGS.length} Bulan
 Total Coaching Selesai: ${coachingData.totalCount}x Minggu
 Hasil Evaluasi: ${smt.ytd.evaluationResult}
 Status: Toko Living World Alam Sutera`;
@@ -464,12 +466,14 @@ Status: Toko Living World Alam Sutera`;
                   {smt.ytd.polisCount} Polis
                 </div>
                 <div className="text-xs font-bold text-indigo-900/80 mt-0.5">
-                  Achieve: {smt.ytd.furniproAchCount}/7 Bulan
+                  Achieve: {smt.ytd.furniproAchCount}/{MONTH_CONFIGS.length} Bulan
                 </div>
               </div>
               <div className="pt-2 border-t-2 border-black/20 flex items-center justify-between text-[11px] font-black text-indigo-950">
-                <span>Nilai Polis:</span>
-                <span>{smt.ytd.rawFurnipro}</span>
+                <span>Rata-rata/Bulan:</span>
+                <span className="bg-indigo-950 text-white px-2 py-0.5 rounded-lg text-[10px]">
+                  {(smt.ytd.polisCount / (MONTH_CONFIGS.length || 1)).toFixed(1)} Polis/bln
+                </span>
               </div>
             </div>
 
@@ -488,12 +492,14 @@ Status: Toko Living World Alam Sutera`;
                   {formatCompactRupiah(smt.ytd.comserVal)}
                 </div>
                 <div className="text-xs font-bold text-emerald-900/80 mt-0.5">
-                  Achieve: {smt.ytd.commserAchCount}/7 Bulan
+                  Achieve: {smt.ytd.commserAchCount}/{MONTH_CONFIGS.length} Bulan
                 </div>
               </div>
               <div className="pt-2 border-t-2 border-black/20 flex items-center justify-between text-[11px] font-black text-emerald-950">
-                <span>Total Comser:</span>
-                <span>{smt.ytd.rawComser}</span>
+                <span>Rata-rata/Bulan:</span>
+                <span className="bg-emerald-950 text-white px-2 py-0.5 rounded-lg text-[10px]">
+                  {formatCompactRupiah(smt.ytd.comserVal / (MONTH_CONFIGS.length || 1))}/bln
+                </span>
               </div>
             </div>
 
@@ -530,15 +536,15 @@ Status: Toko Living World Alam Sutera`;
                   📅
                 </span>
                 <h3 className="text-base sm:text-lg font-black font-display text-black uppercase">
-                  Histori Kinerja Bulanan (Jan - Jul 2026)
+                  Histori Kinerja Bulanan (Jan - {MONTH_CONFIGS[MONTH_CONFIGS.length - 1]?.name || 'Aug'} 2026)
                 </h3>
               </div>
               <span className="text-xs font-black bg-gray-100 px-3 py-1 rounded-xl border border-black/30">
-                Achieve Sales: {smt.ytd.salesAchCount}/7 Bulan
+                Achieve Sales: {smt.ytd.salesAchCount}/{MONTH_CONFIGS.length} Bulan
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-${Math.min(8, MONTH_CONFIGS.length)} gap-2.5`}>
               {MONTH_CONFIGS.map((m) => {
                 const mData = smt.monthly[m.key];
                 return (

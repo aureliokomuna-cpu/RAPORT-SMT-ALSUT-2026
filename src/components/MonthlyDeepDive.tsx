@@ -29,7 +29,8 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
   searchQuery = '',
   onSearchChange,
 }) => {
-  const [selectedMonth, setSelectedMonth] = useState<MonthKey>('jul');
+  const latestMonthKey = MONTH_CONFIGS[MONTH_CONFIGS.length - 1]?.key || 'aug';
+  const [selectedMonth, setSelectedMonth] = useState<MonthKey>(latestMonthKey);
   const [zoneFilter, setZoneFilter] = useState<string>('ALL');
   const [localSearch, setLocalSearch] = useState<string>(searchQuery);
 
@@ -37,9 +38,18 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
     setLocalSearch(searchQuery);
   }, [searchQuery]);
 
+  useEffect(() => {
+    if (MONTH_CONFIGS.length > 0) {
+      const latestKey = MONTH_CONFIGS[MONTH_CONFIGS.length - 1].key;
+      if (!MONTH_CONFIGS.some((m) => m.key === selectedMonth)) {
+        setSelectedMonth(latestKey);
+      }
+    }
+  }, [smtList]);
+
   const effectiveSearch = searchQuery || localSearch;
 
-  const currentMonthConfig = MONTH_CONFIGS.find((m) => m.key === selectedMonth) || MONTH_CONFIGS[6];
+  const currentMonthConfig = MONTH_CONFIGS.find((m) => m.key === selectedMonth) || MONTH_CONFIGS[MONTH_CONFIGS.length - 1];
 
   // Filter SMTs
   const filteredSmts = smtList
@@ -166,16 +176,24 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
         {/* Card 2: Derivative in this Month (Span 4) */}
         <div className="lg:col-span-4 bg-white border-3 border-black rounded-3xl p-5 bento-shadow flex flex-col justify-between">
           <div>
-            <span className="bg-purple-100 text-purple-900 border border-purple-300 px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase">
-              Turunan Bulan {currentMonthConfig.short}
-            </span>
+            <div className="flex justify-between items-center">
+              <span className="bg-purple-100 text-purple-900 border border-purple-300 px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase">
+                Turunan Bulan {currentMonthConfig.short}
+              </span>
+              <span className="text-[10px] font-extrabold text-gray-500">
+                Nilai & Volume
+              </span>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div className="bg-[#F0F2F5] border-2 border-black rounded-2xl p-3 text-center">
                 <span className="text-[10px] font-bold uppercase text-gray-500">Furnipro (FP)</span>
                 <p className="text-2xl font-black font-display text-indigo-700 mt-0.5">
                   {totalFpInMonth}
                 </p>
-                <span className="text-[10px] font-bold text-gray-500">Polis</span>
+                <span className="text-[10px] font-extrabold text-indigo-950 bg-indigo-100 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
+                  {(totalFpInMonth / (totalInCohort || 1)).toFixed(1)} / SMT
+                </span>
               </div>
 
               <div className="bg-[#F0F2F5] border-2 border-black rounded-2xl p-3 text-center">
@@ -183,14 +201,18 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
                 <p className="text-xl font-black font-display text-emerald-700 mt-0.5 truncate">
                   {formatCompactRupiah(totalCcInMonth)}
                 </p>
-                <span className="text-[10px] font-bold text-gray-500">Omset</span>
+                <span className="text-[10px] font-extrabold text-emerald-950 bg-emerald-100 px-1.5 py-0.5 rounded-md inline-block mt-0.5 truncate max-w-full">
+                  {formatCompactRupiah(totalCcInMonth / (totalInCohort || 1))} / SMT
+                </span>
               </div>
             </div>
           </div>
 
           <div className="text-[11px] font-bold text-gray-600 pt-2 border-t border-gray-200 mt-2 flex items-center justify-between">
-            <span>Kontribusi Tim Alsut</span>
-            <span className="text-black font-black">Solid 🔥</span>
+            <span>Rata-rata Produktifitas</span>
+            <span className="text-black font-black">
+              {(totalFpInMonth / (totalInCohort || 1)).toFixed(1)} FP • {formatCompactRupiah(totalCcInMonth / (totalInCohort || 1))} C&C
+            </span>
           </div>
         </div>
 
