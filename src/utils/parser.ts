@@ -35,6 +35,31 @@ export let MONTH_CONFIGS: MonthConfig[] = [
   { key: 'aug', name: 'Agustus', short: 'AUG', salesIdx: 31, fpIdx: 32, ccIdx: 33 },
 ];
 
+export interface CoachingMonthConfig extends MonthConfig {
+  isOngoing?: boolean;
+}
+
+export function getCoachingMonthConfigs(): CoachingMonthConfig[] {
+  const configs: CoachingMonthConfig[] = MONTH_CONFIGS.map((m) => ({ ...m }));
+  // Always include September as ongoing coaching month if not already detected from CSV
+  if (!configs.some((c) => c.key === 'sep')) {
+    configs.push({
+      key: 'sep',
+      name: 'September',
+      short: 'SEP',
+      salesIdx: -1,
+      fpIdx: -1,
+      ccIdx: -1,
+      isOngoing: true,
+    });
+  }
+  return configs;
+}
+
+export function isMonthDataAvailable(monthKey: MonthKey): boolean {
+  return MONTH_CONFIGS.some((m) => m.key === monthKey && m.salesIdx !== -1);
+}
+
 export function parsePercentage(str?: string | null): number {
   if (!str) return 0;
   const clean = str.replace('%', '').replace(',', '.').trim();

@@ -37,7 +37,7 @@ import {
   Maximize2
 } from 'lucide-react';
 import { MonthKey, SmtRecord } from '../types';
-import { formatCompactRupiah, formatPct, formatRupiah, MONTH_CONFIGS } from '../utils/parser';
+import { formatCompactRupiah, formatPct, formatRupiah, MONTH_CONFIGS, getCoachingMonthConfigs } from '../utils/parser';
 import { 
   getCoachingRecord, 
   toggleCategoryWeekCoaching,
@@ -71,13 +71,14 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
     smt ? getCoachingRecord(smt.nip) : getDefaultRecord('')
   );
 
+  const coachingMonths = getCoachingMonthConfigs();
+  const totalMaxWeeks = coachingMonths.length * 4;
+
   // Form State
   const [newTopic, setNewTopic] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newLetterNumber, setNewLetterNumber] = useState('');
-  const [selectedMonthForLog, setSelectedMonthForLog] = useState<MonthKey>(() => 
-    MONTH_CONFIGS[MONTH_CONFIGS.length - 1]?.key || 'aug'
-  );
+  const [selectedMonthForLog, setSelectedMonthForLog] = useState<MonthKey>('sep');
   const [selectedWeekForLog, setSelectedWeekForLog] = useState<WeekKey>('w1');
   const [checkSalesInForm, setCheckSalesInForm] = useState(true);
   const [checkFurniproInForm, setCheckFurniproInForm] = useState(true);
@@ -655,8 +656,10 @@ Status: Toko Living World Alam Sutera`;
                       onChange={(e) => setSelectedMonthForLog(e.target.value as MonthKey)}
                       className="w-full px-3 py-1.5 text-xs font-bold bg-white border-2 border-black rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE600]"
                     >
-                      {MONTH_CONFIGS.map((m) => (
-                        <option key={m.key} value={m.key}>{m.name} 2026</option>
+                      {coachingMonths.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.name} 2026 {m.isOngoing ? '(Bulan Berjalan 📝)' : ''}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -876,7 +879,7 @@ Status: Toko Living World Alam Sutera`;
                       : 'bg-white text-gray-700 border-gray-300 hover:border-black'
                   }`}
                 >
-                  🎯 Sales ({totalSalesWeeksCount}/28 W)
+                  🎯 Sales ({totalSalesWeeksCount}/{totalMaxWeeks} W)
                 </button>
                 <button
                   type="button"
@@ -887,7 +890,7 @@ Status: Toko Living World Alam Sutera`;
                       : 'bg-white text-indigo-900 border-gray-300 hover:border-black'
                   }`}
                 >
-                  🛡️ Furnipro ({totalFurniproWeeksCount}/28 W)
+                  🛡️ Furnipro ({totalFurniproWeeksCount}/{totalMaxWeeks} W)
                 </button>
                 <button
                   type="button"
@@ -898,7 +901,7 @@ Status: Toko Living World Alam Sutera`;
                       : 'bg-white text-emerald-900 border-gray-300 hover:border-black'
                   }`}
                 >
-                  ✨ Clean & Care ({totalComserWeeksCount}/28 W)
+                  ✨ Clean & Care ({totalComserWeeksCount}/{totalMaxWeeks} W)
                 </button>
               </div>
 
@@ -907,9 +910,9 @@ Status: Toko Living World Alam Sutera`;
               </div>
             </div>
 
-            {/* 7-Month Interactive Weekly Cards with Sales, Furnipro & Comser Checkboxes */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 mb-6">
-              {MONTH_CONFIGS.map((m) => {
+            {/* Interactive Weekly Cards for All Coaching Months (Jan s/d Sep) with Sales, Furnipro & Comser Checkboxes */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-6">
+              {coachingMonths.map((m) => {
                 const sWeeks = coachingData.checkedWeeks?.[m.key] || { w1: false, w2: false, w3: false, w4: false };
                 const fWeeks = coachingData.checkedFurniproWeeks?.[m.key] || { w1: false, w2: false, w3: false, w4: false };
                 const cWeeks = coachingData.checkedComserWeeks?.[m.key] || { w1: false, w2: false, w3: false, w4: false };
@@ -918,21 +921,36 @@ Status: Toko Living World Alam Sutera`;
                 const fCount = (fWeeks.w1 ? 1 : 0) + (fWeeks.w2 ? 1 : 0) + (fWeeks.w3 ? 1 : 0) + (fWeeks.w4 ? 1 : 0);
                 const cCount = (cWeeks.w1 ? 1 : 0) + (cWeeks.w2 ? 1 : 0) + (cWeeks.w3 ? 1 : 0) + (cWeeks.w4 ? 1 : 0);
 
-                const mData = smt.monthly[m.key];
+                const mData = smt.monthly[m.key] || {
+                  rawSales: '0%',
+                  salesPct: 0,
+                  grade: 'F',
+                  vibe: 'Bulan Berjalan',
+                  isAchieved: false
+                };
 
                 return (
                   <div
                     key={m.key}
-                    className="border-2 border-black rounded-2xl p-2.5 bg-white shadow-[2px_2px_0px_0px_#000] flex flex-col justify-between"
+                    className={`border-2 border-black rounded-2xl p-2.5 bg-white shadow-[2px_2px_0px_0px_#000] flex flex-col justify-between ${
+                      m.isOngoing ? 'ring-2 ring-[#FFE600] bg-yellow-50/20' : ''
+                    }`}
                   >
                     {/* Month Header */}
                     <div className="pb-1.5 mb-2 border-b border-black/15 flex items-center justify-between">
                       <div>
-                        <span className="text-xs font-black uppercase text-black block leading-tight">
-                          {m.name}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black uppercase text-black block leading-tight">
+                            {m.name}
+                          </span>
+                          {m.isOngoing && (
+                            <span className="text-[8px] font-black bg-[#FFE600] text-black border border-black px-1.5 py-0.2 rounded-md">
+                              Berjalan ⏳
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[9px] font-bold text-gray-500">
-                          {mData.rawSales}
+                          {m.isOngoing ? 'Pencatatan Coaching 📝' : mData.rawSales}
                         </span>
                       </div>
                       <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 border border-black/30">

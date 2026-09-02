@@ -10,11 +10,13 @@ import {
   TrendingUp,
   Award,
   Zap,
-  Filter
+  Filter,
+  MessageSquare
 } from 'lucide-react';
 import { MonthKey, SmtRecord } from '../types';
-import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
+import { formatCompactRupiah, formatPct, MONTH_CONFIGS, getCoachingMonthConfigs, isMonthDataAvailable } from '../utils/parser';
 import { matchesSmtSearch } from '../utils/searchHelper';
+import { getCoachingRecord } from '../utils/coachingStorage';
 
 interface MonthlyDeepDiveProps {
   smtList: SmtRecord[];
@@ -29,8 +31,8 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
   searchQuery = '',
   onSearchChange,
 }) => {
-  const latestMonthKey = MONTH_CONFIGS[MONTH_CONFIGS.length - 1]?.key || 'aug';
-  const [selectedMonth, setSelectedMonth] = useState<MonthKey>(latestMonthKey);
+  const coachingMonths = getCoachingMonthConfigs();
+  const [selectedMonth, setSelectedMonth] = useState<MonthKey>('sep');
   const [zoneFilter, setZoneFilter] = useState<string>('ALL');
   const [localSearch, setLocalSearch] = useState<string>(searchQuery);
 
@@ -38,18 +40,10 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
     setLocalSearch(searchQuery);
   }, [searchQuery]);
 
-  useEffect(() => {
-    if (MONTH_CONFIGS.length > 0) {
-      const latestKey = MONTH_CONFIGS[MONTH_CONFIGS.length - 1].key;
-      if (!MONTH_CONFIGS.some((m) => m.key === selectedMonth)) {
-        setSelectedMonth(latestKey);
-      }
-    }
-  }, [smtList]);
-
   const effectiveSearch = searchQuery || localSearch;
 
-  const currentMonthConfig = MONTH_CONFIGS.find((m) => m.key === selectedMonth) || MONTH_CONFIGS[MONTH_CONFIGS.length - 1];
+  const currentMonthConfig = coachingMonths.find((m) => m.key === selectedMonth) || coachingMonths[coachingMonths.length - 1];
+  const isDataReady = isMonthDataAvailable(selectedMonth);
 
   // Filter SMTs
   const filteredSmts = smtList
@@ -58,32 +52,55 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
       const matchSearch = matchesSmtSearch(s, effectiveSearch);
       return matchZone && matchSearch;
     })
-    .sort((a, b) => b.monthly[selectedMonth].salesPct - a.monthly[selectedMonth].salesPct);
+    .sort((a, b) => {
+      if (!isDataReady) {
+        const aCoach = getCoachingRecord(a.nip);
+        const bCoach = getCoachingRecord(b.nip);
+        const aCount = (aCoach.checkedWeeks[selectedMonth]?.w1 ? 1 : 0) + (aCoach.checkedWeeks[selectedMonth]?.w2 ? 1 : 0) + (aCoach.checkedWeeks[selectedMonth]?.w3 ? 1 : 0) + (aCoach.checkedWeeks[selectedMonth]?.w4 ? 1 : 0);
+        const bCount = (bCoach.checkedWeeks[selectedMonth]?.w1 ? 1 : 0) + (bCoach.checkedWeeks[selectedMonth]?.w2 ? 1 : 0) + (bCoach.checkedWeeks[selectedMonth]?.w3 ? 1 : 0) + (bCoach.checkedWeeks[selectedMonth]?.w4 ? 1 : 0);
+        return bCount - aCount;
+      }
+      return (b.monthly[selectedMonth]?.salesPct || 0) - (a.monthly[selectedMonth]?.salesPct || 0);
+    });
 
   // Month Statistics
   const totalInCohort = smtList.length;
-  const achievedInMonth = smtList.filter((s) => s.monthly[selectedMonth].isAchieved).length;
+  const achievedInMonth = smtList.filter((s) => s.monthly[selectedMonth]?.isAchieved).length;
   const achieveRate = ((achievedInMonth / (totalInCohort || 1)) * 100).toFixed(0);
 
   const avgSalesInMonth =
-    smtList.reduce((sum, s) => sum + s.monthly[selectedMonth].salesPct, 0) / (totalInCohort || 1);
-  const totalFpInMonth = smtList.reduce((sum, s) => sum + s.monthly[selectedMonth].fpCount, 0);
-  const totalCcInMonth = smtList.reduce((sum, s) => sum + s.monthly[selectedMonth].ccVal, 0);
+    smtList.reduce((sum, s) => sum + (s.monthly[selectedMonth]?.salesPct || 0), 0) / (totalInCohort || 1);
+  const totalFpInMonth = smtList.reduce((sum, s) => sum + (s.monthly[selectedMonth]?.fpCount || 0), 0);
+  const totalCcInMonth = smtList.reduce((sum, s) => sum + (s.monthly[selectedMonth]?.ccVal || 0), 0);
+
+  // Coaching counts for ongoing month
+  const smtsWithCoachingInMonth = smtList.filter((s) => {
+    const coach = getCoachingRecord(s.nip);
+    const sWeeks = coach.checkedWeeks[selectedMonth];
+    const fWeeks = coach.checkedFurniproWeeks[selectedMonth];
+    const cWeeks = coach.checkedComserWeeks[selectedMonth];
+    return (
+      sWeeks?.w1 || sWeeks?.w2 || sWeeks?.w3 || sWeeks?.w4 ||
+      fWeeks?.w1 || fWeeks?.w2 || fWeeks?.w3 || fWeeks?.w4 ||
+      cWeeks?.w1 || cWeeks?.w2 || cWeeks?.w3 || cWeeks?.w4 ||
+      coach.customLogs?.some((l) => l.month === selectedMonth)
+    );
+  }).length;
 
   // Grade Counts
   const gradeCounts = {
-    'S+': smtList.filter((s) => s.monthly[selectedMonth].grade === 'S+').length,
-    'S': smtList.filter((s) => s.monthly[selectedMonth].grade === 'S').length,
-    'A': smtList.filter((s) => s.monthly[selectedMonth].grade === 'A').length,
-    'B': smtList.filter((s) => s.monthly[selectedMonth].grade === 'B').length,
-    'C': smtList.filter((s) => s.monthly[selectedMonth].grade === 'C').length,
-    'D': smtList.filter((s) => s.monthly[selectedMonth].grade === 'D').length,
-    'F': smtList.filter((s) => s.monthly[selectedMonth].grade === 'F').length,
+    'S+': smtList.filter((s) => s.monthly[selectedMonth]?.grade === 'S+').length,
+    'S': smtList.filter((s) => s.monthly[selectedMonth]?.grade === 'S').length,
+    'A': smtList.filter((s) => s.monthly[selectedMonth]?.grade === 'A').length,
+    'B': smtList.filter((s) => s.monthly[selectedMonth]?.grade === 'B').length,
+    'C': smtList.filter((s) => s.monthly[selectedMonth]?.grade === 'C').length,
+    'D': smtList.filter((s) => s.monthly[selectedMonth]?.grade === 'D').length,
+    'F': smtList.filter((s) => s.monthly[selectedMonth]?.grade === 'F').length,
   };
 
   // Top 3 SMT of this month
   const top3InMonth = [...smtList]
-    .sort((a, b) => b.monthly[selectedMonth].salesPct - a.monthly[selectedMonth].salesPct)
+    .sort((a, b) => (b.monthly[selectedMonth]?.salesPct || 0) - (a.monthly[selectedMonth]?.salesPct || 0))
     .slice(0, 3);
 
   const getGradeBg = (grade: string) => {
@@ -108,40 +125,76 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <span className="bg-[#FF3E83] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-black tracking-wider">
-              Semester 1 • Evaluasi Bulanan
+              Evaluasi Bulanan & Pembinaan SMT
             </span>
             <h2 className="text-xl sm:text-2xl font-black font-display text-black uppercase mt-1">
-              Penilaian Akhir Tiap Bulan SMT
+              Penilaian & Coaching Tiap Bulan SMT
             </h2>
           </div>
           <span className="text-xs font-bold text-gray-500">
-            Pilih bulan untuk melihat rapor detail performa & evaluasi
+            Pilih bulan untuk melihat rapor detail performa, coaching mingguan & evaluasi
           </span>
         </div>
 
         {/* Month Pills */}
-        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-          {MONTH_CONFIGS.map((m) => {
+        <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+          {coachingMonths.map((m) => {
             const isSelected = selectedMonth === m.key;
             return (
               <button
                 key={m.key}
                 id={`month-tab-${m.key}`}
                 onClick={() => setSelectedMonth(m.key)}
-                className={`py-3 px-2 rounded-2xl border-2 border-black font-display font-black text-center transition-all cursor-pointer ${
+                className={`py-2.5 px-2 rounded-2xl border-2 border-black font-display font-black text-center transition-all cursor-pointer relative ${
                   isSelected
                     ? 'bg-[#FFE600] text-black shadow-[3px_3px_0px_0px_#000] scale-105'
                     : 'bg-[#F4F5F8] text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                <span className="block text-xs uppercase opacity-60 leading-none">Bulan</span>
-                <span className="block text-lg sm:text-xl font-black leading-tight mt-0.5">{m.short}</span>
+                {m.isOngoing && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full border border-black uppercase shadow-xs">
+                    Berjalan ⏳
+                  </span>
+                )}
+                <span className="block text-[10px] uppercase opacity-60 leading-none">Bulan</span>
+                <span className="block text-base sm:text-lg font-black leading-tight mt-0.5">{m.short}</span>
                 <span className="block text-[10px] font-bold text-gray-600 truncate mt-0.5">{m.name}</span>
               </button>
             );
           })}
         </div>
       </div>
+
+      {/* If current month is ongoing and sales data not in CSV yet */}
+      {!isDataReady && (
+        <div className="bg-[#FFE600] border-3 border-black rounded-3xl p-5 bento-shadow flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-black text-[#FFE600] flex items-center justify-center text-2xl font-black shadow-[2px_2px_0px_0px_#000]">
+              📝
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-black text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
+                  Bulan Berjalan
+                </span>
+                <h3 className="text-lg sm:text-xl font-black font-display text-black uppercase">
+                  {currentMonthConfig.name} 2026 — Sesi Coaching Aktif
+                </h3>
+              </div>
+              <p className="text-xs font-bold text-black/80 mt-1">
+                Anda dapat mencatat checklist mingguan (W1-W4), foto, dan surat komitmen SMT. Data capaian sales & peringkat akan otomatis muncul saat data akhir bulan diunggah.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white border-2 border-black rounded-2xl px-4 py-2.5 text-center shrink-0 shadow-[2px_2px_0px_0px_#000]">
+            <span className="text-[10px] font-bold uppercase text-gray-500 block">SMT Dibina di {currentMonthConfig.short}</span>
+            <span className="text-2xl font-black font-display text-indigo-700">
+              {smtsWithCoachingInMonth} <span className="text-xs font-bold text-gray-600">/ {totalInCohort} SMT</span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Month Highlight Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 sm:gap-4">
@@ -313,10 +366,12 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b-2 border-gray-200">
           <div>
             <h3 className="text-lg font-black font-display text-black uppercase">
-              Daftar Evaluasi SMT Bulan {currentMonthConfig.name}
+              {isDataReady 
+                ? `Daftar Evaluasi SMT Bulan ${currentMonthConfig.name}` 
+                : `Daftar Rekap Coaching SMT Bulan ${currentMonthConfig.name} (Bulan Berjalan)`}
             </h3>
             <p className="text-xs font-bold text-gray-500">
-              Menampilkan {filteredSmts.length} SMT terurut berdasarkan capaian sales bulan ini
+              Menampilkan {filteredSmts.length} SMT • Klik kartu SMT untuk input coaching & upload surat komitmen
             </p>
           </div>
 
@@ -349,7 +404,28 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
         {/* List of SMTs in this Month */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {filteredSmts.map((s, idx) => {
-            const data = s.monthly[selectedMonth];
+            const data = s.monthly[selectedMonth] || {
+              rawSales: '0%',
+              salesPct: 0,
+              fpCount: 0,
+              ccVal: 0,
+              grade: 'F',
+              vibe: '-',
+              isAchieved: false,
+              comment: 'Bulan berjalan'
+            };
+
+            const coach = getCoachingRecord(s.nip);
+            const sWeeks = coach.checkedWeeks[selectedMonth] || { w1: false, w2: false, w3: false, w4: false };
+            const fWeeks = coach.checkedFurniproWeeks[selectedMonth] || { w1: false, w2: false, w3: false, w4: false };
+            const cWeeks = coach.checkedComserWeeks[selectedMonth] || { w1: false, w2: false, w3: false, w4: false };
+            const monthLogs = coach.customLogs?.filter((l) => l.month === selectedMonth) || [];
+
+            const totalMonthChecks = 
+              (sWeeks.w1 ? 1 : 0) + (sWeeks.w2 ? 1 : 0) + (sWeeks.w3 ? 1 : 0) + (sWeeks.w4 ? 1 : 0) +
+              (fWeeks.w1 ? 1 : 0) + (fWeeks.w2 ? 1 : 0) + (fWeeks.w3 ? 1 : 0) + (fWeeks.w4 ? 1 : 0) +
+              (cWeeks.w1 ? 1 : 0) + (cWeeks.w2 ? 1 : 0) + (cWeeks.w3 ? 1 : 0) + (cWeeks.w4 ? 1 : 0);
+
             return (
               <div
                 key={s.id}
@@ -367,13 +443,19 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
                       </span>
                     </div>
 
-                    <span
-                      className={`text-xs font-black px-2.5 py-0.5 rounded-lg border border-black shadow-[1px_1px_0px_0px_#000] ${getGradeBg(
-                        data.grade
-                      )}`}
-                    >
-                      Grade {data.grade}
-                    </span>
+                    {isDataReady ? (
+                      <span
+                        className={`text-xs font-black px-2.5 py-0.5 rounded-lg border border-black shadow-[1px_1px_0px_0px_#000] ${getGradeBg(
+                          data.grade
+                        )}`}
+                      >
+                        Grade {data.grade}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-lg border border-black bg-[#FFE600] text-black">
+                        {totalMonthChecks > 0 ? `✓ ${totalMonthChecks}/12 Check` : 'Belum Check'}
+                      </span>
+                    )}
                   </div>
 
                   <h4 className="text-base font-black font-display text-black truncate">
@@ -381,38 +463,65 @@ export const MonthlyDeepDive: React.FC<MonthlyDeepDiveProps> = ({
                   </h4>
                   <span className="text-[11px] font-mono text-gray-500">NIP: {s.nip}</span>
 
-                  <div className="bg-white border border-black rounded-xl p-2.5 my-2.5 space-y-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-gray-500">Sales Achievement:</span>
-                      <span className="font-black text-sm text-black">
-                        {data.rawSales}
-                      </span>
+                  {isDataReady ? (
+                    <div className="bg-white border border-black rounded-xl p-2.5 my-2.5 space-y-1">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-gray-500">Sales Achievement:</span>
+                        <span className="font-black text-sm text-black">
+                          {data.rawSales}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-gray-500">Furnipro:</span>
+                        <span className="font-black text-indigo-700">
+                          {data.fpCount} Polis
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-gray-500">Clean & Care:</span>
+                        <span className="font-black text-teal-700">
+                          {formatCompactRupiah(data.ccVal)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-gray-500">Furnipro:</span>
-                      <span className="font-black text-indigo-700">
-                        {data.fpCount} Polis
-                      </span>
+                  ) : (
+                    <div className="bg-white border border-black/40 rounded-xl p-2.5 my-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-gray-500">Coaching {currentMonthConfig.short}:</span>
+                        <span className="font-black text-black">
+                          Sales: {[sWeeks.w1, sWeeks.w2, sWeeks.w3, sWeeks.w4].filter(Boolean).length}W • FP: {[fWeeks.w1, fWeeks.w2, fWeeks.w3, fWeeks.w4].filter(Boolean).length}W • CC: {[cWeeks.w1, cWeeks.w2, cWeeks.w3, cWeeks.w4].filter(Boolean).length}W
+                        </span>
+                      </div>
+                      {monthLogs.length > 0 && (
+                        <div className="text-[10px] font-extrabold text-indigo-950 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md truncate">
+                          📄 {monthLogs.length} Sesi & Surat Komitmen
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-gray-500">Clean & Care:</span>
-                      <span className="font-black text-teal-700">
-                        {formatCompactRupiah(data.ccVal)}
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-black text-purple-700 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md">
-                      {data.vibe}
+                {isDataReady ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-black text-purple-700 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md">
+                        {data.vibe}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-medium text-gray-700 italic bg-gray-200/70 p-1.5 rounded-lg">
+                      "{data.comment}"
+                    </p>
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t border-gray-300 flex items-center justify-between">
+                    <span className="text-[11px] font-black text-indigo-900 flex items-center gap-1">
+                      <MessageSquare className="w-3.5 h-3.5" /> Catat Pembinaan
+                    </span>
+                    <span className="text-xs font-black bg-black text-[#FFE600] px-2.5 py-1 rounded-xl">
+                      Buka Rapor ➔
                     </span>
                   </div>
-                  <p className="text-[11px] font-medium text-gray-700 italic bg-gray-200/70 p-1.5 rounded-lg">
-                    "{data.comment}"
-                  </p>
-                </div>
+                )}
               </div>
             );
           })}
