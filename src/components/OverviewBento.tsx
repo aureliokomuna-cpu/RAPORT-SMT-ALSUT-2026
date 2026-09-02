@@ -120,83 +120,60 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           </div>
         </div>
 
-        {/* Card 2: 📈 Average Jualan SMT per Bulan (Produktifitas SMT: % & VALUES) (Span 4) */}
+        {/* Card 2: 📈 Overall SMT Productivity (Clean Overall Value & % Overview) (Span 4) */}
         <div className="lg:col-span-4 bg-white border-3 border-black rounded-3xl p-5 bento-shadow relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-start mb-2">
               <span className="bg-[#FF3E83] text-white px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider border border-black shadow-[1px_1px_0px_0px_#000] flex items-center gap-1">
-                <BarChart3 className="w-3 h-3" /> Produktifitas SMT / Bulan
+                <BarChart3 className="w-3 h-3" /> Produktifitas Rata-Rata SMT
               </span>
               <span className="text-[10px] font-black bg-black text-[#FFE600] px-2 py-0.5 rounded-md">
-                {MONTH_CONFIGS.length} Bulan Aktif
+                Overall {MONTH_CONFIGS.length} Bulan
               </span>
             </div>
 
-            {/* Top Primary Productivity Figures: Sales %, FP Count, & C&C Rupiah */}
-            <div className="grid grid-cols-3 gap-2 mt-2 bg-[#F8F9FA] border-2 border-black rounded-2xl p-2.5">
+            {/* Clean Overall Average 3-Metric Display */}
+            <div className="grid grid-cols-3 gap-2 mt-3 bg-[#F8F9FA] border-2 border-black rounded-2xl p-3 shadow-[2px_2px_0px_0px_#000]">
               <div>
-                <p className="text-[9px] font-extrabold uppercase text-gray-500 leading-none">Rata Sales</p>
-                <p className="text-lg sm:text-xl font-black font-display text-black mt-1 leading-none">
+                <p className="text-[10px] font-black uppercase text-gray-500">Rata Sales</p>
+                <h4 className="text-xl sm:text-2xl font-black font-display text-black mt-0.5 leading-tight">
                   {formatPct(overallMonthlyAvgSales)}
-                </p>
-                <span className="text-[8px] font-bold text-emerald-700 block mt-0.5">Target 100%</span>
+                </h4>
+                <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-md inline-block mt-1">
+                  Target 100%
+                </span>
               </div>
-              <div className="border-x border-gray-300 px-1.5 text-center">
-                <p className="text-[9px] font-extrabold uppercase text-gray-500 leading-none">Rata Polis FP</p>
-                <p className="text-lg sm:text-xl font-black font-display text-indigo-700 mt-1 leading-none">
+
+              <div className="border-x-2 border-gray-200 px-2 text-center">
+                <p className="text-[10px] font-black uppercase text-gray-500">Rata Polis FP</p>
+                <h4 className="text-xl sm:text-2xl font-black font-display text-indigo-700 mt-0.5 leading-tight">
                   {overallMonthlyAvgFpPerSmt.toFixed(1)}
-                </p>
-                <span className="text-[8px] font-bold text-gray-500 block mt-0.5">Polis / SMT</span>
+                </h4>
+                <span className="text-[9px] font-black text-indigo-900 bg-indigo-100 border border-indigo-300 px-1.5 py-0.2 rounded-md inline-block mt-1">
+                  Polis / SMT / bln
+                </span>
               </div>
+
               <div className="text-right">
-                <p className="text-[9px] font-extrabold uppercase text-gray-500 leading-none">Rata Clean&Care</p>
-                <p className="text-base sm:text-lg font-black font-display text-emerald-700 mt-1 leading-none truncate">
+                <p className="text-[10px] font-black uppercase text-gray-500">Rata Clean&Care</p>
+                <h4 className="text-lg sm:text-xl font-black font-display text-emerald-700 mt-0.5 leading-tight truncate">
                   {formatCompactRupiah(overallMonthlyAvgCcPerSmt)}
-                </p>
-                <span className="text-[8px] font-bold text-gray-500 block mt-0.5">Rp / SMT</span>
+                </h4>
+                <span className="text-[9px] font-black text-emerald-900 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-md inline-block mt-1">
+                  Rp / SMT / bln
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Monthly Mini Bar Indicators with % AND Values */}
-          <div className="mt-3 pt-2.5 border-t-2 border-gray-200">
-            <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 mb-1.5">
-              <span>Rincian Nilai & % per Bulan:</span>
-              <span className="text-black font-black text-[9px]">Sales% • FP • C&C (Rp)</span>
-            </div>
-            
-            <div className={`grid grid-cols-${Math.min(8, monthlyAverages.length)} gap-1`}>
-              {monthlyAverages.map((m) => {
-                const isOver100 = m.avgSalesPct >= 100;
-                return (
-                  <div
-                    key={m.key}
-                    title={`${m.name}:\n• Rata-rata Sales: ${formatPct(m.avgSalesPct)}\n• Rata-rata Polis FP: ${m.avgFpPerSmt.toFixed(1)} Polis (Total: ${m.totalFp} Polis)\n• Rata-rata C&C: ${formatCompactRupiah(m.avgCcPerSmt)} (Total: ${formatCompactRupiah(m.totalCc)})\n• Lolos Target: ${m.achievedCount}/${totalSmt} SMT`}
-                    className="flex flex-col items-center bg-gray-50 border border-black/40 rounded-xl p-1 text-center hover:bg-yellow-100 hover:scale-105 transition-all cursor-pointer shadow-[1px_1px_0px_0px_#000]"
-                  >
-                    <span className="text-[9px] font-black text-gray-700 leading-none">
-                      {m.short}
-                    </span>
-                    <span className={`text-[10px] font-black leading-tight my-0.5 ${
-                      m.avgSalesPct >= 120 ? 'text-emerald-700' : isOver100 ? 'text-blue-700' : 'text-amber-700'
-                    }`}>
-                      {Math.round(m.avgSalesPct)}%
-                    </span>
-                    <span className="text-[8px] font-extrabold text-indigo-800 leading-none truncate w-full">
-                      {m.avgFpPerSmt.toFixed(0)}p
-                    </span>
-                    <span className="text-[7.5px] font-bold text-emerald-800 leading-none truncate w-full mt-0.5">
-                      {formatCompactRupiah(m.avgCcPerSmt)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-2 text-[10px] font-extrabold text-gray-500 flex items-center justify-between">
-            <span className="text-gray-600">Store Avg: <strong className="text-indigo-800">{Math.round(overallMonthlyTotalFp)} FP</strong> • <strong className="text-emerald-800">{formatCompactRupiah(overallMonthlyTotalCc)} C&C</strong></span>
-            <span className="text-black font-black">Rata-rata/Bulan ✨</span>
+          <div className="mt-3 pt-2.5 border-t-2 border-gray-200 flex items-center justify-between text-xs font-bold text-gray-600">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Store Avg: <strong className="text-indigo-900">{Math.round(overallMonthlyTotalFp)} Polis FP</strong> • <strong className="text-emerald-900">{formatCompactRupiah(overallMonthlyTotalCc)} C&C</strong> / bln
+            </span>
+            <span className="text-[11px] font-black text-black bg-yellow-200 border border-black px-2 py-0.5 rounded-lg">
+              {totalSmt} SMT
+            </span>
           </div>
         </div>
 
