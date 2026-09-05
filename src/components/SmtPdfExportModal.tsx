@@ -25,7 +25,6 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import confetti from 'canvas-confetti';
 import { SmtRecord, MonthKey } from '../types';
 import { 
@@ -35,6 +34,7 @@ import {
   MONTH_CONFIGS 
 } from '../utils/parser';
 import { SmtCoachingRecord, WEEKS } from '../utils/coachingStorage';
+import { generateSmtPdfDocument } from '../utils/pdfGenerator';
 
 interface SmtPdfExportModalProps {
   smt: SmtRecord;
@@ -89,62 +89,47 @@ export const SmtPdfExportModal: React.FC<SmtPdfExportModalProps> = ({
     return `Raport_SMT_${smt.nip}_${cleanName}_${periodStr}.pdf`;
   };
 
-  // Internal helper to render the PDF document via html2canvas & jsPDF
-  const generatePdfBlob = async (): Promise<{ pdf: jsPDF; blob: Blob; filename: string } | null> => {
-    if (!printAreaRef.current) return null;
+  const triggerFileDownload = (blob: Blob, filename: string, pdfDoc: jsPDF) => {
+    try {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1500);
+    } catch {
+      // Fallback for environments where dynamic blob link clicks are blocked
+      pdfDoc.save(filename);
+    }
+  };
 
+  // Helper to generate vector PDF document via jsPDF & autoTable
+  const generatePdfBlob = async (): Promise<{ pdf: jsPDF; blob: Blob; filename: string } | null> => {
     try {
       setIsGenerating(true);
-      setGeneratingProgress('Menyiapkan tata letak dokumen...');
+      setGeneratingProgress('Menyiapkan tata letak dokumen PDF resmi...');
 
-      // Small delay to ensure styles and webfonts settle
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Small delay for responsive UI feedback
+      await new Promise((resolve) => setTimeout(resolve, 80));
 
-      setGeneratingProgress('Merender halaman raport ke grafis resolusi tinggi (2x Retina)...');
-      
-      const canvas = await html2canvas(printAreaRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 1024,
+      setGeneratingProgress('Mengonversi tabel dan data raport SMT ke format PDF A4...');
+
+      const result = generateSmtPdfDocument(smt, coachingData, {
+        focusMonth,
+        includeMonthlyTable,
+        includeCoachingLogs,
+        includeSignatures,
+        includeRecommendations,
       });
 
-      setGeneratingProgress('Mengonversi ke format PDF standar cetak A4...');
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.96);
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      const pageWidth = 210; // A4 standard width in mm
-      const pageHeight = 297; // A4 standard height in mm
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-
-      // Handle multi-page documents if content exceeds standard A4 height
-      while (heightLeft > 5) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
-      }
-
-      const filename = getCleanPdfFilename();
-      const blob = pdf.output('blob');
-
-      return { pdf, blob, filename };
+      return result;
     } catch (err) {
       console.error('Failed to generate PDF:', err);
-      alert('Terjadi kendala saat merender PDF. Silakan gunakan opsi Cetak browser.');
+      alert('Terjadi kendala saat merender PDF: ' + (err instanceof Error ? err.message : String(err)));
       return null;
     } finally {
       setIsGenerating(false);
@@ -157,7 +142,7 @@ export const SmtPdfExportModal: React.FC<SmtPdfExportModalProps> = ({
     const result = await generatePdfBlob();
     if (!result) return;
 
-    result.pdf.save(result.filename);
+    triggerFileDownload(result.blob, result.filename, result.pdf);
     triggerCelebration();
   };
 
@@ -186,7 +171,7 @@ export const SmtPdfExportModal: React.FC<SmtPdfExportModalProps> = ({
     }
 
     // Fallback: Download file automatically and provide WhatsApp share option
-    result.pdf.save(result.filename);
+    triggerFileDownload(result.blob, result.filename, result.pdf);
     triggerCelebration();
     setShowWaInput(true);
   };
@@ -196,7 +181,7 @@ export const SmtPdfExportModal: React.FC<SmtPdfExportModalProps> = ({
     // Generate and download PDF first so user has the file ready to attach
     const result = await generatePdfBlob();
     if (result) {
-      result.pdf.save(result.filename);
+      triggerFileDownload(result.blob, result.filename, result.pdf);
       triggerCelebration();
     }
 
