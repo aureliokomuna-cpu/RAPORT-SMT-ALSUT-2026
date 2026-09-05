@@ -119,7 +119,7 @@ export interface FilterState {
   selectedMonth: MonthKey | 'ytd';
   sortBy: 'rank' | 'sales' | 'polis' | 'comser' | 'name' | 'achCount' | 'sp';
   sortOrder: 'asc' | 'desc';
-  activeView: 'bento' | 'table' | 'leaderboard' | 'zones' | 'monthly_drill' | 'sp_history';
+  activeView: 'bento' | 'table' | 'leaderboard' | 'zones' | 'monthly_drill' | 'sp_history' | 'bottom20';
   spFilter?: 'ALL' | 'ACTIVE_SP' | 'NO_SP' | 'S1' | 'S2';
 }
 

@@ -9,6 +9,7 @@ import { LeaderboardPodium } from './components/LeaderboardPodium';
 import { ZoneBattleView } from './components/ZoneBattleView';
 import { TableView } from './components/TableView';
 import { SpHistoryView } from './components/SpHistoryView';
+import { Bottom20View } from './components/Bottom20View';
 
 import { FilterState, SmtRecord, SpRecord, ZoneSummary } from './types';
 import { computeZoneSummaries, parseSmtCsv, parseSpCsv } from './utils/parser';
@@ -212,6 +213,7 @@ export default function App() {
               smtList={smtList}
               zoneSummaries={zoneSummaries}
               onSelectSmt={(smt) => setSelectedSmt(smt)}
+              onNavigateToBottom20={() => handleFilterChange({ activeView: 'bottom20' })}
             />
 
             {/* Filter & Sort Controls */}
@@ -272,6 +274,16 @@ export default function App() {
 
         {filters.activeView === 'leaderboard' && (
           <LeaderboardPodium
+            smtList={smtList}
+            onSelectSmt={(smt) => setSelectedSmt(smt)}
+            searchQuery={filters.searchQuery}
+            onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
+            onSwitchToBottom20={() => handleFilterChange({ activeView: 'bottom20' })}
+          />
+        )}
+
+        {filters.activeView === 'bottom20' && (
+          <Bottom20View
             smtList={smtList}
             onSelectSmt={(smt) => setSelectedSmt(smt)}
             searchQuery={filters.searchQuery}

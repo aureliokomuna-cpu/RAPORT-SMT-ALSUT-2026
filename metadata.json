@@ -1,6 +1,6 @@
 {
   "name": "Raport YTD SMT Alsut 2026",
-  "description": "Aplikasi Raport YTD SMT Alsuters 2026 bertema Bento Grid modern dan Gen-Z dengan penilaian performa bulanan, analisis zona, raport individual, serta fitur kirim dan ekspor PDF resmi interaktif.",
+  "description": "Aplikasi Raport YTD SMT Alsuters 2026 bertema Bento Grid modern dengan penilaian performa bulanan, leaderboard, menu 20 SMT rank terbawah (prioritas supervisi), analisis zona, raport individual, serta fitur kirim dan ekspor PDF resmi.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

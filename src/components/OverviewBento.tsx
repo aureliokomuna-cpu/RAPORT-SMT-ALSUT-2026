@@ -20,12 +20,14 @@ interface OverviewBentoProps {
   smtList: SmtRecord[];
   zoneSummaries: ZoneSummary[];
   onSelectSmt: (smt: SmtRecord) => void;
+  onNavigateToBottom20?: () => void;
 }
 
 export const OverviewBento: React.FC<OverviewBentoProps> = ({
   smtList,
   zoneSummaries,
   onSelectSmt,
+  onNavigateToBottom20,
 }) => {
   if (!smtList.length) return null;
 
@@ -228,9 +230,19 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
             </div>
           </div>
 
-          <p className="text-[10px] font-bold opacity-75 mt-1 text-center">
-            {(( (bestPerformers.length + safeSmts.length) / totalSmt ) * 100).toFixed(0)}% SMT berstatus Hijau / Aman
-          </p>
+          <div className="mt-2 pt-2 border-t border-white/20 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold opacity-75">
+              {(( (bestPerformers.length + safeSmts.length) / totalSmt ) * 100).toFixed(0)}% SMT Aman
+            </p>
+            {onNavigateToBottom20 && (
+              <button
+                onClick={onNavigateToBottom20}
+                className="text-[10px] font-black uppercase bg-[#FFE600] hover:bg-white text-black px-2 py-0.5 rounded-lg border border-black transition-colors cursor-pointer shadow-[1px_1px_0px_0px_#000]"
+              >
+                20 Rank Terbawah 🔻
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Card 4: Furnipro & Clean Care Derivative Total (Span 6) */}

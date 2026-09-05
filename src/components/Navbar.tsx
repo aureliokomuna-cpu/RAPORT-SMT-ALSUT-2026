@@ -12,7 +12,8 @@ import {
   CheckCircle2, 
   ShieldAlert,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  TrendingDown
 } from 'lucide-react';
 import { FilterState, SmtRecord } from '../types';
 import { matchesSmtSearch, extractDigits } from '../utils/searchHelper';
@@ -253,6 +254,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Trophy className="w-3.5 h-3.5 text-[#FFD166]" />
               <span>Leaderboard</span>
+            </button>
+
+            <button
+              id="view-bottom20-button"
+              onClick={() => onFilterChange({ activeView: 'bottom20' })}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer ${
+                filters.activeView === 'bottom20'
+                  ? 'bg-black text-[#EF476F] shadow-[2px_2px_0px_0px_#EF476F]'
+                  : 'bg-white text-gray-800 hover:bg-red-50 shadow-[2px_2px_0px_0px_#000]'
+              }`}
+            >
+              <TrendingDown className="w-3.5 h-3.5 text-[#EF476F]" />
+              <span>20 Rank Terbawah</span>
+              <span className="bg-[#EF476F] text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                Prioritas
+              </span>
             </button>
 
             <button

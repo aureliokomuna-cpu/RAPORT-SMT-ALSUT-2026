@@ -9,7 +9,8 @@ import {
   ArrowRight,
   Shield,
   Star,
-  Search
+  Search,
+  TrendingDown
 } from 'lucide-react';
 import { SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct } from '../utils/parser';
@@ -20,6 +21,7 @@ interface LeaderboardPodiumProps {
   onSelectSmt: (smt: SmtRecord) => void;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
+  onSwitchToBottom20?: () => void;
 }
 
 export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({
@@ -27,6 +29,7 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({
   onSelectSmt,
   searchQuery = '',
   onSearchChange,
+  onSwitchToBottom20,
 }) => {
   const sortedAll = [...smtList].sort((a, b) => b.ytd.salesPct - a.ytd.salesPct);
   const first = sortedAll[0];
@@ -61,11 +64,23 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({
           </p>
         </div>
 
-        <div className="bg-white/10 border-2 border-white/30 rounded-2xl p-3 text-center sm:min-w-[140px]">
-          <span className="text-[10px] font-bold uppercase text-gray-300">Total Contenders</span>
-          <p className="text-2xl sm:text-3xl font-black font-display text-[#FFE600]">
-            {smtList.length} SMT
-          </p>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+          <div className="bg-white/10 border-2 border-white/30 rounded-2xl p-3 text-center sm:min-w-[130px]">
+            <span className="text-[10px] font-bold uppercase text-gray-300">Total Contenders</span>
+            <p className="text-2xl sm:text-3xl font-black font-display text-[#FFE600]">
+              {smtList.length} SMT
+            </p>
+          </div>
+
+          {onSwitchToBottom20 && (
+            <button
+              onClick={onSwitchToBottom20}
+              className="px-3.5 py-3 bg-[#EF476F] hover:bg-[#d8325a] text-white border-2 border-black rounded-2xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-[2px_2px_0px_0px_#FFE600]"
+            >
+              <TrendingDown className="w-4 h-4" />
+              <span>20 Rank Terbawah 🔻</span>
+            </button>
+          )}
         </div>
       </div>
 
