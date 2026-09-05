@@ -34,8 +34,10 @@ import {
   Shield,
   Sparkle,
   FileCheck,
-  Maximize2
+  Maximize2,
+  FileDown
 } from 'lucide-react';
+import { SmtPdfExportModal } from './SmtPdfExportModal';
 import { MonthKey, SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct, formatRupiah, MONTH_CONFIGS, getCoachingMonthConfigs } from '../utils/parser';
 import { 
@@ -92,6 +94,9 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
 
   // Category view filter for matrix
   const [activeMatrixTab, setActiveMatrixTab] = useState<'all' | 'sales' | 'furnipro' | 'comser'>('all');
+
+  // Interactive PDF Share & Export Modal
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -395,11 +400,20 @@ Status: Toko Living World Alam Sutera`;
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button
+              onClick={() => setIsPdfModalOpen(true)}
+              title="Kirim & Bagikan Raport sebagai PDF Interaktif"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-[#FFE600] hover:bg-yellow-300 text-black rounded-xl border-2 border-black text-xs font-black flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer shadow-[2px_2px_0px_0px_#000] no-print"
+            >
+              <FileDown className="w-4 h-4 text-black" />
+              <span>Kirim PDF</span>
+            </button>
+
+            <button
               onClick={handleCopySummary}
-              title="Salin Rangkuman SMT"
+              title="Salin Rangkuman Teks SMT"
               className="p-2 sm:px-3 sm:py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl border border-neutral-700 text-xs font-bold flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer no-print"
             >
-              <Share2 className="w-4 h-4 text-[#FFE600]" />
+              <Share2 className="w-4 h-4 text-[#06D6A0]" />
               <span className="hidden sm:inline">{copied ? 'Tersalin!' : 'Salin'}</span>
             </button>
 
@@ -408,7 +422,7 @@ Status: Toko Living World Alam Sutera`;
               title="Cetak Raport SMT"
               className="p-2 sm:px-3 sm:py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl border border-neutral-700 text-xs font-bold flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer no-print"
             >
-              <Printer className="w-4 h-4 text-[#06D6A0]" />
+              <Printer className="w-4 h-4 text-gray-300" />
               <span className="hidden sm:inline">Cetak</span>
             </button>
 
@@ -1278,6 +1292,32 @@ Status: Toko Living World Alam Sutera`;
                 </ul>
               </div>
 
+              {/* Interactive PDF Share Banner */}
+              <div className="mt-4 p-4 bg-gradient-to-r from-[#FFE600]/30 to-[#06D6A0]/20 border-2 border-black rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-[2px_2px_0px_0px_#000] no-print">
+                <div className="flex items-center gap-3 text-left w-full sm:w-auto">
+                  <div className="p-2.5 bg-black text-[#FFE600] rounded-xl border border-black shrink-0">
+                    <FileDown className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black text-black">
+                      Butuh Dokumen Raport Resmi Bertanda Tangan?
+                    </h5>
+                    <p className="text-[11px] text-gray-700 font-medium">
+                      Ekspor ke lembar PDF A4 standar perusahaan, lengkap dengan tabel, evaluasi, dan stempel Living World Alam Sutera.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPdfModalOpen(true)}
+                  className="px-4 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 shrink-0 shadow-[2px_2px_0px_0px_#000] w-full sm:w-auto justify-center"
+                >
+                  <FileDown className="w-4 h-4 text-[#FFE600]" />
+                  <span>Buka & Bagikan PDF</span>
+                </button>
+              </div>
+
               <div className="mt-3 text-[11px] font-black text-gray-500 text-right">
                 Diperbarui untuk Alsuters 2026
               </div>
@@ -1312,6 +1352,14 @@ Status: Toko Living World Alam Sutera`;
         )}
 
       </div>
+
+      {/* Interactive PDF Share & Export Modal */}
+      <SmtPdfExportModal
+        smt={smt}
+        coachingData={coachingData}
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+      />
     </div>
   );
 };

@@ -8,8 +8,10 @@ import {
   ChevronLeft,
   ChevronRight,
   UserCheck,
-  Check
+  Check,
+  FileDown
 } from 'lucide-react';
+import { SmtPdfExportModal } from './SmtPdfExportModal';
 import { SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
 import { matchesSmtSearch } from '../utils/searchHelper';
@@ -37,6 +39,7 @@ export const TableView: React.FC<TableViewProps> = ({
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [selectedPdfSmt, setSelectedPdfSmt] = useState<SmtRecord | null>(null);
   const [coachingMap, setCoachingMap] = useState<Record<string, SmtCoachingRecord>>(() => 
     getAllCoachingRecords()
   );
@@ -281,13 +284,25 @@ export const TableView: React.FC<TableViewProps> = ({
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-center">
-                    <button
-                      onClick={() => onSelectSmt(s)}
-                      className="p-1.5 bg-black hover:bg-neutral-800 text-white rounded-lg border border-black transition-transform hover:scale-105 cursor-pointer"
-                      title="Buka Raport SMT"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-[#FFE600]" />
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => onSelectSmt(s)}
+                        className="p-1.5 bg-black hover:bg-neutral-800 text-white rounded-lg border border-black transition-transform hover:scale-105 cursor-pointer"
+                        title="Buka Raport SMT"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-[#FFE600]" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPdfSmt(s);
+                        }}
+                        className="p-1.5 bg-[#FFE600] hover:bg-yellow-300 text-black rounded-lg border border-black transition-transform hover:scale-105 cursor-pointer shadow-[1px_1px_0px_0px_#000]"
+                        title="Kirim & Bagikan Raport PDF"
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -338,6 +353,25 @@ export const TableView: React.FC<TableViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Interactive PDF Share & Export Modal */}
+      {selectedPdfSmt && (
+        <SmtPdfExportModal
+          smt={selectedPdfSmt}
+          coachingData={
+            coachingMap[selectedPdfSmt.nip] || {
+              nip: selectedPdfSmt.nip,
+              totalCount: 0,
+              checkedWeeks: {},
+              checkedFurniproWeeks: {},
+              checkedComserWeeks: {},
+              logs: [],
+            }
+          }
+          isOpen={!!selectedPdfSmt}
+          onClose={() => setSelectedPdfSmt(null)}
+        />
+      )}
 
     </div>
   );
