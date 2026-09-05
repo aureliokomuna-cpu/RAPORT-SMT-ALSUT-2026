@@ -441,7 +441,7 @@ Status: Toko Living World Alam Sutera`;
                   {smt.ytd.rawSales}
                 </div>
                 <div className="text-xs font-bold text-black/80 mt-0.5">
-                  Target: {smt.ytd.rawTarget} ({formatPct(smt.ytd.salesPct)})
+                  Target: 100% ({formatPct(smt.ytd.salesPct)})
                 </div>
               </div>
               <div className="pt-2 border-t-2 border-black/20 flex items-center justify-between text-[11px] font-black">
@@ -576,15 +576,15 @@ Status: Toko Living World Alam Sutera`;
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">Target:</span>
-                          <span className="font-bold text-gray-700">{mData.rawTarget}</span>
+                          <span className="font-bold text-gray-700">100%</span>
                         </div>
                         <div className="flex justify-between pt-1 border-t border-dashed border-gray-300">
                           <span className="text-indigo-900 font-bold">FP:</span>
-                          <span className="font-black text-indigo-950">{mData.rawFurnipro} ({mData.polis} P)</span>
+                          <span className="font-black text-indigo-950">{mData.rawFp} Polis</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-emerald-900 font-bold">Clean & Care:</span>
-                          <span className="font-black text-emerald-950">{mData.rawComser}</span>
+                          <span className="font-black text-emerald-950">{mData.rawCc}</span>
                         </div>
                       </div>
                     </div>
