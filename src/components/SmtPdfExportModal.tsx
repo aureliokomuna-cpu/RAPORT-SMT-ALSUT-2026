@@ -90,21 +90,59 @@ export const SmtPdfExportModal: React.FC<SmtPdfExportModalProps> = ({
   };
 
   const triggerFileDownload = (blob: Blob, filename: string, pdfDoc: jsPDF) => {
+    let downloadSuccess = false;
     try {
+      // Direct Blob URL download approach
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
+      downloadSuccess = true;
       setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 1500);
-    } catch {
-      // Fallback for environments where dynamic blob link clicks are blocked
-      pdfDoc.save(filename);
+        try {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore cleanup error
+        }
+      }, 2000);
+    } catch (e) {
+      console.warn('Blob URL download failed, falling back to jsPDF save:', e);
     }
+
+    if (!downloadSuccess) {
+      try {
+        pdfDoc.save(filename);
+      } catch (err2) {
+        console.warn('jsPDF save failed, opening in new window:', err2);
+        try {
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+        } catch (err3) {
+          console.error('All PDF download mechanisms failed:', err3);
+        }
+      }
+    }
+  };
+
+  // Open PDF in a new tab (works 100% on iOS Safari, Android Chrome, and PC with popup blockers)
+  const handleOpenPdfInNewTab = async () => {
+    const result = await generatePdfBlob();
+    if (!result) return;
+    try {
+      const url = URL.createObjectURL(result.blob);
+      const newWin = window.open(url, '_blank');
+      if (!newWin) {
+        // If popup blocked, fallback to normal download
+        triggerFileDownload(result.blob, result.filename, result.pdf);
+      }
+    } catch {
+      triggerFileDownload(result.blob, result.filename, result.pdf);
+    }
+    triggerCelebration();
   };
 
   // Helper to generate vector PDF document via jsPDF & autoTable
@@ -601,6 +639,17 @@ Status: Toko Informa Living World Alam Sutera (2026)`;
                 >
                   <Download className="w-4 h-4" />
                   <span>{isGenerating ? 'Membuat PDF...' : 'Unduh Dokumen PDF'}</span>
+                </button>
+
+                {/* 1b. Open PDF in New Tab (Ideal for Mobile / Browser Restrictions) */}
+                <button
+                  onClick={handleOpenPdfInNewTab}
+                  disabled={isGenerating}
+                  className="w-full py-2 px-3 bg-white hover:bg-yellow-50 text-black border-2 border-black rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 transition-all disabled:opacity-50"
+                  title="Buka dokumen PDF di tab baru browser untuk pratinjau & simpan manual jika unduhan terblokir"
+                >
+                  <Eye className="w-4 h-4 text-blue-600" />
+                  <span>Buka di Tab Baru / Cetak ↗</span>
                 </button>
 
                 {/* 2. Direct Web Share / Device Share */}

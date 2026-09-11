@@ -35,7 +35,16 @@ import {
   Sparkle,
   FileCheck,
   Maximize2,
-  FileDown
+  FileDown,
+  ExternalLink,
+  FolderSync,
+  FolderOpen,
+  Link as LinkIcon,
+  Copy,
+  Edit3,
+  Save,
+  CheckCheck,
+  FileUp
 } from 'lucide-react';
 import { SmtPdfExportModal } from './SmtPdfExportModal';
 import { MonthKey, SmtRecord } from '../types';
@@ -54,7 +63,15 @@ import {
   WeekKey,
   WEEKS,
   ALL_MONTH_KEYS,
-  getDefaultRecord
+  getDefaultRecord,
+  getGoogleDriveUrl,
+  setGoogleDriveUrl,
+  processAndCompressFile,
+  autoSaveAttachmentToSmt,
+  saveCoachingDraft,
+  getCoachingDraft,
+  clearCoachingDraft,
+  DEFAULT_GDRIVE_URL
 } from '../utils/coachingStorage';
 
 interface SmtDetailModalProps {
@@ -76,10 +93,21 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
   const coachingMonths = getCoachingMonthConfigs();
   const totalMaxWeeks = coachingMonths.length * 4;
 
+  // Google Drive states
+  const [gDriveUrl, setGDriveUrl] = useState<string>(() => getGoogleDriveUrl());
+  const [isEditingGDrive, setIsEditingGDrive] = useState(false);
+  const [customGDriveInput, setCustomGDriveInput] = useState('');
+  const [driveCopied, setDriveCopied] = useState(false);
+
+  // Auto-Save Notification & Status
+  const [autoSaveNotification, setAutoSaveNotification] = useState<string | null>(null);
+  const [isUploadingAutoSave, setIsUploadingAutoSave] = useState(false);
+
   // Form State
   const [newTopic, setNewTopic] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newLetterNumber, setNewLetterNumber] = useState('');
+  const [newDriveUrl, setNewDriveUrl] = useState('');
   const [selectedMonthForLog, setSelectedMonthForLog] = useState<MonthKey>('sep');
   const [selectedWeekForLog, setSelectedWeekForLog] = useState<WeekKey>('w1');
   const [checkSalesInForm, setCheckSalesInForm] = useState(true);
@@ -88,6 +116,7 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
   const [pendingAttachments, setPendingAttachments] = useState<CoachingAttachment[]>([]);
   const [showAddLog, setShowAddLog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [draftSavedTime, setDraftSavedTime] = useState<string | null>(null);
 
   // Preview / Lightbox Modal State
   const [activePreviewAttachment, setActivePreviewAttachment] = useState<CoachingAttachment | null>(null);
@@ -99,16 +128,58 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const instantUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (smt) {
       setCoachingData(getCoachingRecord(smt.nip));
+      setGDriveUrl(getGoogleDriveUrl());
+
+      // Restore saved draft for this SMT if available
+      const draft = getCoachingDraft(smt.nip);
+      if (draft) {
+        if (draft.topic) setNewTopic(draft.topic);
+        if (draft.notes) setNewNotes(draft.notes);
+        if (draft.letterNumber) setNewLetterNumber(draft.letterNumber);
+        if (draft.driveUrl) setNewDriveUrl(draft.driveUrl);
+        if (draft.month) setSelectedMonthForLog(draft.month);
+        if (draft.week) setSelectedWeekForLog(draft.week);
+        if (draft.salesChecked !== undefined) setCheckSalesInForm(draft.salesChecked);
+        if (draft.furniproChecked !== undefined) setCheckFurniproInForm(draft.furniproChecked);
+        if (draft.comserChecked !== undefined) setCheckComserInForm(draft.comserChecked);
+        if (draft.lastSavedAt) setDraftSavedTime(draft.lastSavedAt);
+      }
+
       const unsubscribe = subscribeToCoachingUpdates(() => {
         setCoachingData(getCoachingRecord(smt.nip));
+        setGDriveUrl(getGoogleDriveUrl());
       });
       return unsubscribe;
     }
   }, [smt?.nip]);
+
+  // Debounced auto-save for form draft
+  useEffect(() => {
+    if (!smt) return;
+    if (newTopic || newNotes || newLetterNumber || newDriveUrl) {
+      const timer = setTimeout(() => {
+        saveCoachingDraft(smt.nip, {
+          topic: newTopic,
+          notes: newNotes,
+          letterNumber: newLetterNumber,
+          driveUrl: newDriveUrl,
+          month: selectedMonthForLog,
+          week: selectedWeekForLog,
+          salesChecked: checkSalesInForm,
+          furniproChecked: checkFurniproInForm,
+          comserChecked: checkComserInForm,
+        });
+        const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setDraftSavedTime(nowStr);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [newTopic, newNotes, newLetterNumber, newDriveUrl, selectedMonthForLog, selectedWeekForLog, checkSalesInForm, checkFurniproInForm, checkComserInForm, smt?.nip]);
 
   if (!smt) return null;
 
@@ -157,46 +228,83 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
     }
   };
 
-  // Convert File to Base64 Attachment
-  const processFiles = (files: FileList | null) => {
+  // Google Drive Helpers
+  const handleSaveCustomGDrive = () => {
+    if (!customGDriveInput.trim()) return;
+    setGoogleDriveUrl(customGDriveInput.trim());
+    setGDriveUrl(customGDriveInput.trim());
+    setIsEditingGDrive(false);
+    setAutoSaveNotification('✅ Link Google Drive Toko berhasil diperbarui & disimpan otomatis!');
+    setTimeout(() => setAutoSaveNotification(null), 4000);
+  };
+
+  const handleCopyGDrive = () => {
+    navigator.clipboard.writeText(gDriveUrl);
+    setDriveCopied(true);
+    setTimeout(() => setDriveCopied(false), 2500);
+  };
+
+  // Instant Auto-Save of Uploaded Files
+  const handleAutoSaveUploadFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !smt) return;
+    setIsUploadingAutoSave(true);
+    try {
+      const fileArray = Array.from(files);
+      for (const file of fileArray) {
+        const attachment = await processAndCompressFile(file);
+        const updated = await autoSaveAttachmentToSmt(smt.nip, attachment, {
+          month: selectedMonthForLog,
+          week: selectedWeekForLog,
+          topic: `Upload Dokumen: ${file.name}`,
+          notes: `Berkas surat komitmen / foto pembinaan SMT diunggah & tersimpan otomatis ke database.`,
+          driveUrl: gDriveUrl
+        });
+        setCoachingData({ ...updated });
+      }
+
+      setAutoSaveNotification(`✅ ${fileArray.length} berkas berhasil tersimpan otomatis & siap diakses kapan saja!`);
+      setTimeout(() => setAutoSaveNotification(null), 5000);
+
+      confetti({
+        particleCount: 45,
+        spread: 55,
+        origin: { y: 0.65 },
+        colors: ['#06D6A0', '#FFE600', '#4285F4']
+      });
+    } catch (err) {
+      console.error('Upload auto-save error:', err);
+      setAutoSaveNotification('⚠️ Gagal memproses file, silakan coba lagi');
+      setTimeout(() => setAutoSaveNotification(null), 4000);
+    } finally {
+      setIsUploadingAutoSave(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (instantUploadInputRef.current) instantUploadInputRef.current.value = '';
+    }
+  };
+
+  // Process Files for Form Upload
+  const processFilesForForm = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((file) => {
-      const isImage = file.type.startsWith('image/');
-      const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        if (!dataUrl) return;
-
-        const sizeInKb = Math.round(file.size / 1024);
-        const formattedSize = sizeInKb > 1024 ? `${(sizeInKb / 1024).toFixed(1)} MB` : `${sizeInKb} KB`;
-
-        const newAttachment: CoachingAttachment = {
-          id: `att_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-          name: file.name,
-          type: isImage ? 'image' : isPdf ? 'pdf' : 'document',
-          dataUrl,
-          sizeFormatted: formattedSize,
-          uploadedAt: new Date().toLocaleDateString('id-ID'),
-        };
-
-        setPendingAttachments((prev) => [...prev, newAttachment]);
-      };
-
-      reader.readAsDataURL(file);
-    });
+    try {
+      const fileArray = Array.from(files);
+      for (const file of fileArray) {
+        const att = await processAndCompressFile(file);
+        setPendingAttachments((prev) => [...prev, att]);
+      }
+    } catch (err) {
+      console.error('File compression error:', err);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    processFiles(e.target.files);
+    processFilesForForm(e.target.files);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    processFiles(e.dataTransfer.files);
+    handleAutoSaveUploadFiles(e.dataTransfer.files);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -221,6 +329,7 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
       topic: newTopic.trim(),
       notes: newNotes.trim(),
       letterNumber: newLetterNumber.trim() || undefined,
+      driveUrl: newDriveUrl.trim() || undefined,
       month: selectedMonthForLog,
       week: selectedWeekForLog,
       salesChecked: checkSalesInForm,
@@ -230,11 +339,16 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
     });
 
     setCoachingData({ ...updated });
+    clearCoachingDraft(smt.nip);
     setNewTopic('');
     setNewNotes('');
     setNewLetterNumber('');
+    setNewDriveUrl('');
     setPendingAttachments([]);
     setShowAddLog(false);
+
+    setAutoSaveNotification('✅ Sesi pembinaan & dokumen berhasil tersimpan otomatis!');
+    setTimeout(() => setAutoSaveNotification(null), 4000);
 
     confetti({
       particleCount: 50,
@@ -619,6 +733,125 @@ Status: Toko Living World Alam Sutera`;
           {/* Section: Interactive Weekly Coaching Matrix (Sales, Furnipro, Comser) & Document Uploader */}
           <div className="bg-white border-3 border-black rounded-3xl p-5 bento-shadow">
             
+            {/* Auto-Save Notification Toast/Banner */}
+            {autoSaveNotification && (
+              <div className="mb-4 p-3 bg-emerald-50 border-2 border-emerald-500 rounded-2xl flex items-center justify-between shadow-sm animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚡</span>
+                  <p className="text-xs font-black text-emerald-900">{autoSaveNotification}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAutoSaveNotification(null)}
+                  className="text-xs font-bold text-emerald-700 hover:text-emerald-950 p-1"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Google Drive Store Repository Banner */}
+            <div className="mb-5 bg-gradient-to-r from-blue-50 via-indigo-50 to-amber-50 border-2 border-blue-400 rounded-2xl p-4 shadow-[2px_2px_0px_0px_#2563EB]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-white border-2 border-blue-500 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+                    <FolderSync className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-xs sm:text-sm font-black text-blue-950 uppercase tracking-tight">
+                        📁 Google Drive Dokumen Coaching Store Alam Sutera
+                      </h4>
+                      <span className="text-[9px] font-black bg-emerald-100 text-emerald-900 border border-emerald-400 px-2 py-0.5 rounded-full">
+                        ⚡ Auto-Save Aktif
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-semibold text-blue-800/80 mt-0.5">
+                      Penyimpanan terpusat arsip surat komitmen, foto pembinaan, dan form evaluasi mingguan SMT.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  <a
+                    href={gDriveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-1.5 bg-[#4285F4] hover:bg-blue-600 text-white border-2 border-black rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-transform hover:scale-105"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Buka Google Drive ↗</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyGDrive}
+                    className="px-3 py-1.5 bg-white hover:bg-gray-100 text-black border-2 border-black rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000] cursor-pointer"
+                    title="Salin Link Google Drive"
+                  >
+                    {driveCopied ? (
+                      <>
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700 font-black">Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-gray-700" />
+                        <span>Salin Link</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingGDrive(!isEditingGDrive);
+                      setCustomGDriveInput(gDriveUrl);
+                    }}
+                    className="px-3 py-1.5 bg-white hover:bg-gray-100 text-black border-2 border-black rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000] cursor-pointer"
+                    title="Ubah URL Google Drive Toko"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-gray-700" />
+                    <span>Ubah Link</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Editable URL Input */}
+              {isEditingGDrive && (
+                <div className="mt-3 pt-3 border-t border-blue-200 flex flex-col sm:flex-row items-center gap-2 animate-in fade-in">
+                  <div className="flex-1 w-full">
+                    <label className="text-[10px] font-black uppercase text-blue-900 block mb-1">
+                      Kustomisasi Link Folder Google Drive Toko:
+                    </label>
+                    <input
+                      type="url"
+                      value={customGDriveInput}
+                      onChange={(e) => setCustomGDriveInput(e.target.value)}
+                      placeholder="https://drive.google.com/drive/folders/..."
+                      className="w-full px-3 py-1.5 text-xs font-semibold bg-white border-2 border-black rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE600]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto mt-2 sm:mt-4">
+                    <button
+                      type="button"
+                      onClick={handleSaveCustomGDrive}
+                      className="px-3 py-1.5 bg-black hover:bg-neutral-800 text-[#FFE600] border-2 border-black rounded-xl text-xs font-black uppercase cursor-pointer"
+                    >
+                      Simpan Link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingGDrive(false)}
+                      className="px-3 py-1.5 bg-white hover:bg-gray-100 text-black border-2 border-black rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Title & Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b-2 border-gray-200">
               <div className="flex items-center gap-2.5">
@@ -630,19 +863,39 @@ Status: Toko Living World Alam Sutera`;
                     Checklist & Log Pembinaan Mingguan SMT
                   </h3>
                   <p className="text-[11px] font-bold text-gray-500">
-                    Ceklis mingguan (W1-W4) untuk Sales, Furnipro, Clean & Care + Upload Foto & Surat Komitmen
+                    Ceklis mingguan (W1-W4) untuk Sales, Furnipro, Clean & Care + Upload Foto & Surat Komitmen (Tersimpan Otomatis)
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Instant Upload Button */}
+                <input
+                  type="file"
+                  ref={instantUploadInputRef}
+                  onChange={(e) => handleAutoSaveUploadFiles(e.target.files)}
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={isUploadingAutoSave}
+                  onClick={() => instantUploadInputRef.current?.click()}
+                  className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs rounded-xl border-2 border-black flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-transform hover:scale-105 disabled:opacity-50"
+                  title="Upload berkas dan simpan otomatis tanpa perlu mengisi formulir panjang"
+                >
+                  <FileUp className="w-4 h-4" />
+                  <span>{isUploadingAutoSave ? 'Menyimpan Otomatis...' : '⚡ Upload Cepat (Auto-Save)'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowAddLog(!showAddLog)}
                   className="px-3.5 py-2 bg-[#FFE600] hover:bg-yellow-300 text-black font-black text-xs rounded-xl border-2 border-black flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000] cursor-pointer transition-transform hover:scale-105"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  <span>{showAddLog ? 'Tutup Form' : '+ Catat Sesi & Upload Surat Komitmen'}</span>
+                  <span>{showAddLog ? 'Tutup Form' : '+ Catat Sesi & Upload Berkas'}</span>
                 </button>
               </div>
             </div>
@@ -772,6 +1025,24 @@ Status: Toko Living World Alam Sutera`;
                   </div>
                 </div>
 
+                {/* Google Drive Document Link (Optional) */}
+                <div className="mb-3">
+                  <label className="text-[10px] font-black uppercase text-blue-900 block mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <FolderSync className="w-3.5 h-3.5 text-blue-600" />
+                      Link Dokumen Google Drive Khusus Sesi Ini (Opsional):
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-semibold">Tautan G-Drive Surat Komitmen / Foto</span>
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="Misal: https://drive.google.com/file/d/... (Opsional jika berkas tersimpan di Google Drive)"
+                    value={newDriveUrl}
+                    onChange={(e) => setNewDriveUrl(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs font-semibold bg-white border-2 border-black rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE600]"
+                  />
+                </div>
+
                 {/* File / Photo Upload Dropzone (Supports Drag & Drop and Manual Selection) */}
                 <div className="mb-4">
                   <label className="text-[10px] font-black uppercase text-gray-700 block mb-1 flex items-center justify-between">
@@ -849,20 +1120,33 @@ Status: Toko Living World Alam Sutera`;
                   )}
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2 border-t border-black/10">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddLog(false)}
-                    className="px-4 py-1.5 bg-white hover:bg-gray-100 text-black border-2 border-black rounded-xl text-xs font-bold cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-1.5 bg-black hover:bg-neutral-800 text-[#FFE600] border-2 border-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_0px_#FFE600] transition-transform hover:scale-102"
-                  >
-                    Simpan Sesi & Dokumen 💾
-                  </button>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-black/10">
+                  <div className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5">
+                    {draftSavedTime ? (
+                      <span className="text-emerald-700 font-black flex items-center gap-1">
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        Draf tersimpan otomatis ({draftSavedTime})
+                      </span>
+                    ) : (
+                      <span>⚡ Auto-save aktif: isian formulir otomatis tersimpan saat diketik</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddLog(false)}
+                      className="px-4 py-1.5 bg-white hover:bg-gray-100 text-black border-2 border-black rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-1.5 bg-black hover:bg-neutral-800 text-[#FFE600] border-2 border-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_0px_#FFE600] transition-transform hover:scale-102"
+                    >
+                      Simpan Sesi & Dokumen 💾
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
@@ -1161,12 +1445,28 @@ Status: Toko Living World Alam Sutera`;
                                 ✓ Comser
                               </span>
                             )}
+
+                            {log.driveUrl && (
+                              <a
+                                href={log.driveUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-black bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-400 px-2 py-0.5 rounded-md cursor-pointer transition-colors shadow-sm"
+                                title="Buka berkas di Google Drive"
+                              >
+                                <FolderSync className="w-3 h-3 text-blue-600" />
+                                <span>Google Drive ↗</span>
+                              </a>
+                            )}
                           </div>
 
                           <div className="text-[11px] text-gray-500 font-bold flex items-center gap-2 mt-1">
                             <span>🕒 {log.date}</span>
                             <span>•</span>
                             <span>Pembina: {log.coachName || 'SPV Store Alsut'}</span>
+                            <span className="text-emerald-700 font-black text-[9px] bg-emerald-50 border border-emerald-300 px-1.5 py-0.2 rounded-full">
+                              💾 Tersimpan Otomatis
+                            </span>
                           </div>
 
                           {log.notes && (
