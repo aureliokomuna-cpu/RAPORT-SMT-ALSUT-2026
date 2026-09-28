@@ -62,12 +62,70 @@ const LEGACY_STORAGE_V2 = 'alsut_smt_coaching_v2';
 const LEGACY_STORAGE_V1 = 'alsut_smt_coaching_v1';
 const STORAGE_DRIVE_KEY = 'alsut_gdrive_folder_url';
 const DRAFT_PREFIX = 'alsut_coaching_draft_';
+const DEVICE_ID_KEY = 'alsut_device_client_id';
 
 // Default Google Drive folder for Store Alsut Coaching Documents
 export const DEFAULT_GDRIVE_URL = 'https://drive.google.com/drive/folders/1Alsut-SMT-Coaching-Dokumen-2026?usp=sharing';
 
 // Custom event for cross-component reactive updates
 const COACHING_UPDATE_EVENT = 'alsut_coaching_updated';
+export const SYNC_STATUS_EVENT = 'alsut_sync_status_updated';
+
+export interface SyncStatus {
+  isOnline: boolean;
+  isSyncing: boolean;
+  lastSyncedAt: Date | null;
+  serverConnected: boolean;
+  connectedDevices: number;
+  totalSyncedRecords: number;
+  lastError?: string | null;
+}
+
+let syncStatusState: SyncStatus = {
+  isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+  isSyncing: false,
+  lastSyncedAt: null,
+  serverConnected: false,
+  connectedDevices: 1,
+  totalSyncedRecords: 0,
+  lastError: null,
+};
+
+export const getDeviceId = (): string => {
+  if (typeof window === 'undefined') return 'server_side';
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return 'temp_device_' + Date.now();
+  }
+};
+
+const notifySyncStatus = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SYNC_STATUS_EVENT, { detail: syncStatusState }));
+  }
+};
+
+export const getSyncStatus = (): SyncStatus => ({ ...syncStatusState });
+
+export const subscribeToSyncStatus = (callback: (status: SyncStatus) => void): (() => void) => {
+  if (typeof window === 'undefined') return () => {};
+  const handler = (e: Event) => {
+    const custom = e as CustomEvent<SyncStatus>;
+    callback(custom.detail || syncStatusState);
+  };
+  window.addEventListener(SYNC_STATUS_EVENT, handler);
+  // Initial fire
+  callback(syncStatusState);
+  return () => {
+    window.removeEventListener(SYNC_STATUS_EVENT, handler);
+  };
+};
 
 // In-memory cache
 let memoryStorage: Record<string, SmtCoachingRecord> = {};
@@ -417,7 +475,7 @@ const loadAllRecords = (): Record<string, SmtCoachingRecord> => {
   return memoryStorage;
 };
 
-const saveAllRecords = (records: Record<string, SmtCoachingRecord>) => {
+const saveAllRecords = (records: Record<string, SmtCoachingRecord>, skipServerPush: boolean = false) => {
   memoryStorage = records;
   
   // 1. Asynchronously save all records to IndexedDB (virtually unlimited quota!)
@@ -436,7 +494,6 @@ const saveAllRecords = (records: Record<string, SmtCoachingRecord>) => {
   } catch (e) {
     console.warn('LocalStorage quota reached or warning, falling back to light mirror:', e);
     // Graceful fallback for localStorage 5MB limit:
-    // Strip large dataUrl from localStorage copy, while IndexedDB & memory keep the full base64!
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         const sanitized: Record<string, SmtCoachingRecord> = {};
@@ -460,6 +517,11 @@ const saveAllRecords = (records: Record<string, SmtCoachingRecord>) => {
       console.warn('LocalStorage write skipped, data is safe in IndexedDB:', e2);
       window.dispatchEvent(new CustomEvent(COACHING_UPDATE_EVENT));
     }
+  }
+
+  // 3. Trigger immediate real-time sync to server for multi-device connectivity
+  if (!skipServerPush && typeof window !== 'undefined') {
+    schedulePushToServer(records);
   }
 };
 
@@ -812,3 +874,259 @@ export const getCoachingMonthConfigs = () => [
   { key: 'aug' as MonthKey, name: 'Agustus' },
   { key: 'sep' as MonthKey, name: 'September', isOngoing: true },
 ];
+
+// ==========================================
+// Multi-Device Cloud Synchronization Engine
+// ==========================================
+
+function mergeRecordPair(existing: SmtCoachingRecord | undefined, incoming: SmtCoachingRecord): SmtCoachingRecord {
+  if (!existing) return incoming;
+  const merged = { ...existing };
+
+  // 1. Union weekly checkboxes
+  for (const m of ALL_MONTH_KEYS) {
+    merged.checkedWeeks[m] = {
+      w1: !!(existing.checkedWeeks[m]?.w1 || incoming.checkedWeeks[m]?.w1),
+      w2: !!(existing.checkedWeeks[m]?.w2 || incoming.checkedWeeks[m]?.w2),
+      w3: !!(existing.checkedWeeks[m]?.w3 || incoming.checkedWeeks[m]?.w3),
+      w4: !!(existing.checkedWeeks[m]?.w4 || incoming.checkedWeeks[m]?.w4),
+    };
+    merged.checkedFurniproWeeks[m] = {
+      w1: !!(existing.checkedFurniproWeeks[m]?.w1 || incoming.checkedFurniproWeeks[m]?.w1),
+      w2: !!(existing.checkedFurniproWeeks[m]?.w2 || incoming.checkedFurniproWeeks[m]?.w2),
+      w3: !!(existing.checkedFurniproWeeks[m]?.w3 || incoming.checkedFurniproWeeks[m]?.w3),
+      w4: !!(existing.checkedFurniproWeeks[m]?.w4 || incoming.checkedFurniproWeeks[m]?.w4),
+    };
+    merged.checkedComserWeeks[m] = {
+      w1: !!(existing.checkedComserWeeks[m]?.w1 || incoming.checkedComserWeeks[m]?.w1),
+      w2: !!(existing.checkedComserWeeks[m]?.w2 || incoming.checkedComserWeeks[m]?.w2),
+      w3: !!(existing.checkedComserWeeks[m]?.w3 || incoming.checkedComserWeeks[m]?.w3),
+      w4: !!(existing.checkedComserWeeks[m]?.w4 || incoming.checkedComserWeeks[m]?.w4),
+    };
+  }
+
+  // 2. Union logs by ID
+  const logMap = new Map<string, CoachingLog>();
+  (existing.customLogs || []).forEach((l) => logMap.set(l.id, l));
+  (incoming.customLogs || []).forEach((l) => {
+    if (!logMap.has(l.id)) {
+      logMap.set(l.id, l);
+    } else {
+      const prev = logMap.get(l.id)!;
+      const prevAttCount = prev.attachments?.length || 0;
+      const incAttCount = l.attachments?.length || 0;
+      if (incAttCount >= prevAttCount) {
+        logMap.set(l.id, { ...prev, ...l });
+      }
+    }
+  });
+
+  merged.customLogs = Array.from(logMap.values());
+  if (incoming.driveUrl && incoming.driveUrl.trim()) {
+    merged.driveUrl = incoming.driveUrl.trim();
+  }
+  merged.totalCount = calculateTotal(merged);
+  merged.lastAutoSavedAt = incoming.lastAutoSavedAt || existing.lastAutoSavedAt;
+  return merged;
+}
+
+let pushDebounceTimer: any = null;
+
+export const schedulePushToServer = (records: Record<string, SmtCoachingRecord>) => {
+  if (typeof window === 'undefined') return;
+
+  if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
+  pushDebounceTimer = setTimeout(async () => {
+    syncStatusState.isSyncing = true;
+    notifySyncStatus();
+
+    try {
+      const response = await fetch('/api/coaching/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientRecords: records,
+          deviceId: getDeviceId(),
+        }),
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        if (json.success && json.records) {
+          // Merge incoming server truth with current memory storage
+          let changed = false;
+          const mergedRecords: Record<string, SmtCoachingRecord> = { ...memoryStorage };
+
+          for (const nip in json.records) {
+            const serverRec = json.records[nip];
+            const currentMem = mergedRecords[nip];
+            const merged = mergeRecordPair(currentMem, serverRec);
+            mergedRecords[nip] = merged;
+            changed = true;
+          }
+
+          if (changed) {
+            saveAllRecords(mergedRecords, true); // true = skipServerPush to avoid ping-pong
+          }
+
+          syncStatusState = {
+            ...syncStatusState,
+            isOnline: true,
+            isSyncing: false,
+            serverConnected: true,
+            lastSyncedAt: new Date(),
+            totalSyncedRecords: Object.keys(mergedRecords).length,
+            lastError: null,
+          };
+          notifySyncStatus();
+        }
+      } else {
+        syncStatusState.isSyncing = false;
+        syncStatusState.lastError = `Server responded ${response.status}`;
+        notifySyncStatus();
+      }
+    } catch (err: any) {
+      console.warn('[Sync] Server push skipped (offline or server starting):', err?.message);
+      syncStatusState = {
+        ...syncStatusState,
+        isSyncing: false,
+        serverConnected: false,
+        lastError: 'Tidak dapat terhubung ke server',
+      };
+      notifySyncStatus();
+    }
+  }, 400);
+};
+
+export const pullSyncFromServer = async (): Promise<boolean> => {
+  if (typeof window === 'undefined') return false;
+
+  syncStatusState.isSyncing = true;
+  notifySyncStatus();
+
+  try {
+    const res = await fetch('/api/coaching?t=' + Date.now(), { cache: 'no-cache' });
+    if (!res.ok) throw new Error('Fetch failed ' + res.status);
+    const json = await res.json();
+
+    if (json.success && json.records) {
+      const serverRecords: Record<string, SmtCoachingRecord> = json.records;
+      const localRecords = loadAllRecords();
+      let hasChanges = false;
+      const merged: Record<string, SmtCoachingRecord> = { ...localRecords };
+
+      for (const nip in serverRecords) {
+        const sRec = serverRecords[nip];
+        const lRec = localRecords[nip];
+        const result = mergeRecordPair(lRec, sRec);
+        merged[nip] = result;
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
+        saveAllRecords(merged, true); // Save locally without echoing back to server
+      }
+
+      syncStatusState = {
+        ...syncStatusState,
+        isOnline: true,
+        isSyncing: false,
+        serverConnected: true,
+        lastSyncedAt: new Date(),
+        totalSyncedRecords: Object.keys(merged).length,
+        lastError: null,
+      };
+      notifySyncStatus();
+      return true;
+    }
+  } catch (e: any) {
+    console.warn('[Sync] Pull failed:', e?.message);
+    syncStatusState = {
+      ...syncStatusState,
+      isSyncing: false,
+      serverConnected: false,
+      lastError: e?.message,
+    };
+    notifySyncStatus();
+  }
+  return false;
+};
+
+export const forceSyncNow = async (): Promise<void> => {
+  const current = loadAllRecords();
+  await pullSyncFromServer();
+  schedulePushToServer(current);
+};
+
+// ==========================================
+// Real-time EventSource & Polling Auto-Start
+// ==========================================
+if (typeof window !== 'undefined') {
+  // Listen for online/offline window events
+  window.addEventListener('online', () => {
+    syncStatusState.isOnline = true;
+    notifySyncStatus();
+    forceSyncNow();
+  });
+  window.addEventListener('offline', () => {
+    syncStatusState.isOnline = false;
+    notifySyncStatus();
+  });
+
+  // Setup Server-Sent Events (SSE) for instant cross-device updates
+  let eventSource: EventSource | null = null;
+  const connectSSE = () => {
+    if (typeof EventSource === 'undefined') return;
+    try {
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource('/api/coaching/events');
+
+      eventSource.onopen = () => {
+        syncStatusState.serverConnected = true;
+        notifySyncStatus();
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data && data.sourceDeviceId && data.sourceDeviceId === getDeviceId()) {
+            // Ignore echoes from self
+            return;
+          }
+          if (data.type === 'sync' || data.type === 'update_single' || data.type === 'delete_log') {
+            pullSyncFromServer();
+          }
+        } catch {}
+      };
+
+      eventSource.onerror = () => {
+        syncStatusState.serverConnected = false;
+        notifySyncStatus();
+        if (eventSource) eventSource.close();
+        setTimeout(connectSSE, 5000);
+      };
+    } catch (e) {
+      console.warn('SSE init failed:', e);
+    }
+  };
+
+  // Initial sync on mount
+  setTimeout(() => {
+    connectSSE();
+    pullSyncFromServer().then(() => {
+      // Push any local records that the server didn't have yet
+      const local = loadAllRecords();
+      if (Object.keys(local).length > 0) {
+        schedulePushToServer(local);
+      }
+    });
+  }, 300);
+
+  // Fallback Polling every 12 seconds in case SSE is interrupted or backgrounded
+  setInterval(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      pullSyncFromServer();
+    }
+  }, 12000);
+}
+

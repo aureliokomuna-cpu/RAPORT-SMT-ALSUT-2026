@@ -21,6 +21,7 @@ interface OverviewBentoProps {
   zoneSummaries: ZoneSummary[];
   onSelectSmt: (smt: SmtRecord) => void;
   onNavigateToBottom20?: () => void;
+  onNavigateToCoached?: () => void;
 }
 
 export const OverviewBento: React.FC<OverviewBentoProps> = ({
@@ -28,6 +29,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   zoneSummaries,
   onSelectSmt,
   onNavigateToBottom20,
+  onNavigateToCoached,
 }) => {
   if (!smtList.length) return null;
 
@@ -230,18 +232,28 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
             </div>
           </div>
 
-          <div className="mt-2 pt-2 border-t border-white/20 flex items-center justify-between gap-2">
+          <div className="mt-2 pt-2 border-t border-white/20 flex items-center justify-between gap-2 flex-wrap">
             <p className="text-[10px] font-bold opacity-75">
               {(( (bestPerformers.length + safeSmts.length) / totalSmt ) * 100).toFixed(0)}% SMT Aman
             </p>
-            {onNavigateToBottom20 && (
-              <button
-                onClick={onNavigateToBottom20}
-                className="text-[10px] font-black uppercase bg-[#FFE600] hover:bg-white text-black px-2 py-0.5 rounded-lg border border-black transition-colors cursor-pointer shadow-[1px_1px_0px_0px_#000]"
-              >
-                20 Rank Terbawah 🔻
-              </button>
-            )}
+            <div className="flex items-center gap-1.5">
+              {onNavigateToCoached && (
+                <button
+                  onClick={onNavigateToCoached}
+                  className="text-[10px] font-black uppercase bg-[#06D6A0] hover:bg-white text-black px-2 py-0.5 rounded-lg border border-black transition-colors cursor-pointer shadow-[1px_1px_0px_0px_#000]"
+                >
+                  SMT Dipanggil 📋
+                </button>
+              )}
+              {onNavigateToBottom20 && (
+                <button
+                  onClick={onNavigateToBottom20}
+                  className="text-[10px] font-black uppercase bg-[#FFE600] hover:bg-white text-black px-2 py-0.5 rounded-lg border border-black transition-colors cursor-pointer shadow-[1px_1px_0px_0px_#000]"
+                >
+                  20 Rank Terbawah 🔻
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

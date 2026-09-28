@@ -36,6 +36,7 @@ interface Bottom20ViewProps {
   onSelectSmt: (smt: SmtRecord, initialTab?: 'profile' | 'monthly' | 'coaching' | 'sp') => void;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
+  onNavigateToCoached?: () => void;
 }
 
 type SortBottomBy = 'rank_lowest_first' | 'rank_asc' | 'sales_asc' | 'fp_asc' | 'cc_asc' | 'coaching_needed';
@@ -45,6 +46,7 @@ export const Bottom20View: React.FC<Bottom20ViewProps> = ({
   onSelectSmt,
   searchQuery = '',
   onSearchChange,
+  onNavigateToCoached,
 }) => {
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [selectedZone, setSelectedZone] = useState<string>('ALL');
@@ -279,6 +281,14 @@ export const Bottom20View: React.FC<Bottom20ViewProps> = ({
             <p className="text-[11px] font-bold text-gray-600 mt-0.5">
               <span className="text-red-600 font-extrabold">{stats.uncoachedCount} SMT</span> butuh sesi
             </p>
+            {onNavigateToCoached && (
+              <button
+                onClick={onNavigateToCoached}
+                className="mt-2 text-[10px] font-black text-black bg-[#06D6A0] hover:bg-emerald-300 px-2 py-0.5 rounded-lg border border-black inline-flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_0px_#000]"
+              >
+                Lihat SMT Dipanggil ↗
+              </button>
+            )}
           </div>
         </div>
 

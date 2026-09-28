@@ -10,6 +10,7 @@ import { ZoneBattleView } from './components/ZoneBattleView';
 import { TableView } from './components/TableView';
 import { SpHistoryView } from './components/SpHistoryView';
 import { Bottom20View } from './components/Bottom20View';
+import { CoachedSmtsView } from './components/CoachedSmtsView';
 
 import { FilterState, SmtRecord, SpRecord, ZoneSummary } from './types';
 import { computeZoneSummaries, parseSmtCsv, parseSpCsv } from './utils/parser';
@@ -214,6 +215,7 @@ export default function App() {
               zoneSummaries={zoneSummaries}
               onSelectSmt={(smt) => setSelectedSmt(smt)}
               onNavigateToBottom20={() => handleFilterChange({ activeView: 'bottom20' })}
+              onNavigateToCoached={() => handleFilterChange({ activeView: 'coached_smts' })}
             />
 
             {/* Filter & Sort Controls */}
@@ -282,12 +284,23 @@ export default function App() {
           />
         )}
 
+        {filters.activeView === 'coached_smts' && (
+          <CoachedSmtsView
+            smtList={smtList}
+            onSelectSmt={(smt) => setSelectedSmt(smt)}
+            searchQuery={filters.searchQuery}
+            onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
+            onNavigateToBottom20={() => handleFilterChange({ activeView: 'bottom20' })}
+          />
+        )}
+
         {filters.activeView === 'bottom20' && (
           <Bottom20View
             smtList={smtList}
             onSelectSmt={(smt) => setSelectedSmt(smt)}
             searchQuery={filters.searchQuery}
             onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
+            onNavigateToCoached={() => handleFilterChange({ activeView: 'coached_smts' })}
           />
         )}
 

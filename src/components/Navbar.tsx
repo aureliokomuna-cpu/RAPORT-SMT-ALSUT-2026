@@ -13,11 +13,21 @@ import {
   ShieldAlert,
   ArrowRight,
   UserCheck,
-  TrendingDown
+  TrendingDown,
+  Wifi,
+  Cloud
 } from 'lucide-react';
 import { FilterState, SmtRecord } from '../types';
 import { matchesSmtSearch, extractDigits } from '../utils/searchHelper';
 import { formatCompactRupiah } from '../utils/parser';
+import {
+  getCoachingRecord,
+  subscribeToCoachingUpdates,
+  subscribeToSyncStatus,
+  forceSyncNow,
+  getSyncStatus,
+  SyncStatus,
+} from '../utils/coachingStorage';
 
 interface NavbarProps {
   filters: FilterState;
@@ -42,6 +52,40 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [coachedCount, setCoachedCount] = useState<number>(0);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(getSyncStatus());
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+
+  // Subscribe to coaching count & cloud sync status
+  useEffect(() => {
+    const updateCoachedCount = () => {
+      let count = 0;
+      smtList.forEach((s) => {
+        const rec = getCoachingRecord(s.nip);
+        if ((rec?.customLogs && rec.customLogs.length > 0) || (rec?.totalCount && rec.totalCount > 0)) {
+          count++;
+        }
+      });
+      setCoachedCount(count);
+    };
+
+    updateCoachedCount();
+    const unsub = subscribeToCoachingUpdates(updateCoachedCount);
+    const unsubSync = subscribeToSyncStatus(setSyncStatus);
+    return () => {
+      unsub();
+      unsubSync();
+    };
+  }, [smtList]);
+
+  const handleCloudSync = async () => {
+    setIsSyncingCloud(true);
+    try {
+      await forceSyncNow();
+    } finally {
+      setTimeout(() => setIsSyncingCloud(false), 600);
+    }
+  };
 
   // Close dropdown when clicked outside
   useEffect(() => {
@@ -201,6 +245,28 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <button
+              id="cloud-sync-button"
+              onClick={handleCloudSync}
+              disabled={isSyncingCloud || syncStatus.isSyncing}
+              title={
+                syncStatus.serverConnected
+                  ? 'Koneksi Multi-Device Aktif: Semua HP/PC tersinkron otomatis. Klik untuk sync instan.'
+                  : 'Mencoba menghubungkan server... Klik untuk coba koneksi ulang.'
+              }
+              className={`flex items-center gap-1.5 px-3 py-2 border-2 border-black rounded-xl text-xs font-black uppercase tracking-wider bento-shadow-hover shrink-0 cursor-pointer transition-all ${
+                syncStatus.serverConnected
+                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-950'
+                  : 'bg-yellow-50 hover:bg-yellow-100 text-yellow-900'
+              }`}
+            >
+              <Cloud className={`w-3.5 h-3.5 ${isSyncingCloud || syncStatus.isSyncing ? 'animate-bounce text-[#FF3E83]' : syncStatus.serverConnected ? 'text-emerald-600' : 'text-amber-600'}`} />
+              <span className="hidden sm:inline">
+                {isSyncingCloud ? 'Syncing...' : syncStatus.serverConnected ? 'Device Sync' : 'Reconnecting...'}
+              </span>
+              <span className={`w-2 h-2 rounded-full ${syncStatus.serverConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+            </button>
+
+            <button
               id="refresh-data-button"
               onClick={onRefresh}
               disabled={isLoading}
@@ -213,7 +279,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* View Switcher Tabs (Bento, Table, Leaderboard, Monthly Drill, Zones) */}
+        {/* View Switcher Tabs (Bento, Table, Leaderboard, Monthly Drill, Zones, Coached SMTs) */}
         <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 no-scrollbar">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button
@@ -227,6 +293,38 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Grid className="w-3.5 h-3.5 text-[#FFE600]" />
               <span>Bento Cards</span>
+            </button>
+
+            <button
+              id="view-coached-smts-button"
+              onClick={() => onFilterChange({ activeView: 'coached_smts' })}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer ${
+                filters.activeView === 'coached_smts'
+                  ? 'bg-black text-[#FFE600] shadow-[2px_2px_0px_0px_#FFE600]'
+                  : 'bg-white text-gray-800 hover:bg-yellow-50 shadow-[2px_2px_0px_0px_#000]'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5 text-[#06D6A0]" />
+              <span>SMT Pernah Dipanggil</span>
+              <span className="bg-[#FFE600] text-black text-[9px] px-1.5 py-0.2 rounded-full font-black border border-black">
+                {coachedCount} SMT
+              </span>
+            </button>
+
+            <button
+              id="view-bottom20-button"
+              onClick={() => onFilterChange({ activeView: 'bottom20' })}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer ${
+                filters.activeView === 'bottom20'
+                  ? 'bg-black text-[#EF476F] shadow-[2px_2px_0px_0px_#EF476F]'
+                  : 'bg-white text-gray-800 hover:bg-red-50 shadow-[2px_2px_0px_0px_#000]'
+              }`}
+            >
+              <TrendingDown className="w-3.5 h-3.5 text-[#EF476F]" />
+              <span>20 Rank Terbawah</span>
+              <span className="bg-[#EF476F] text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                Prioritas
+              </span>
             </button>
 
             <button
@@ -254,22 +352,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Trophy className="w-3.5 h-3.5 text-[#FFD166]" />
               <span>Leaderboard</span>
-            </button>
-
-            <button
-              id="view-bottom20-button"
-              onClick={() => onFilterChange({ activeView: 'bottom20' })}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer ${
-                filters.activeView === 'bottom20'
-                  ? 'bg-black text-[#EF476F] shadow-[2px_2px_0px_0px_#EF476F]'
-                  : 'bg-white text-gray-800 hover:bg-red-50 shadow-[2px_2px_0px_0px_#000]'
-              }`}
-            >
-              <TrendingDown className="w-3.5 h-3.5 text-[#EF476F]" />
-              <span>20 Rank Terbawah</span>
-              <span className="bg-[#EF476F] text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
-                Prioritas
-              </span>
             </button>
 
             <button
