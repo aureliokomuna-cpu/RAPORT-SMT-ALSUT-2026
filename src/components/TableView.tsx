@@ -15,6 +15,7 @@ import { SmtPdfExportModal } from './SmtPdfExportModal';
 import { SmtRecord } from '../types';
 import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
 import { matchesSmtSearch } from '../utils/searchHelper';
+import { evaluateSmtKpi } from '../utils/kpiCalculator';
 import { 
   getCoachingRecord, 
   getAllCoachingRecords, 
@@ -199,6 +200,9 @@ export const TableView: React.FC<TableViewProps> = ({
                 Coaching (W)
               </th>
               <th className="py-3 px-3 border-r border-gray-800">Evaluasi Result</th>
+              <th className="py-3 px-3 border-r border-gray-800 bg-neutral-900 text-[#FFE600] text-center">
+                Penilaian KPI 2026 (Store • Personal • Derivatif)
+              </th>
               <th className="py-3 px-3 text-center">Aksi</th>
             </tr>
           </thead>
@@ -206,6 +210,7 @@ export const TableView: React.FC<TableViewProps> = ({
             {paginated.map((s, idx) => {
               const coachRec = coachingMap[s.nip] || getCoachingRecord(s.nip);
               const coachCount = coachRec.totalCount || 0;
+              const kpi = evaluateSmtKpi(s);
 
               return (
                 <tr 
@@ -282,6 +287,24 @@ export const TableView: React.FC<TableViewProps> = ({
                     >
                       {s.ytd.evaluationResult}
                     </span>
+                  </td>
+
+                  {/* 🌟 KPI Assessment Column (Store, Personal, Derivatif) */}
+                  <td className="py-2.5 px-3 border-r border-gray-200">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-1.5 py-0.5 rounded bg-black text-[#FFE600] font-black text-[10px]">
+                        Grade {s.ytd.overallGrade}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-300 font-bold text-[10px]" title="Store Ach: 103.0% (Sangat Baik)">
+                        🏬 103% (Sangat Baik)
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${kpi.personalTier.badgeBg} ${kpi.personalTier.badgeText}`} title={`Personal Sales: ${kpi.personalPctFormatted} (${kpi.personalTier.tier})`}>
+                        👤 {kpi.personalPctFormatted} ({kpi.personalTier.tier})
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${kpi.derivativeTier.badgeBg} ${kpi.derivativeTier.badgeText}`} title={`Derivatif: ${kpi.derivativePctFormatted} (${kpi.derivativeTier.tier})`}>
+                        🛡️ {kpi.derivativePctFormatted} ({kpi.derivativeTier.tier})
+                      </span>
+                    </div>
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     <div className="flex items-center justify-center gap-1">

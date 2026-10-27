@@ -23,6 +23,7 @@ import {
   SmtCoachingRecord,
   WEEKS
 } from '../utils/coachingStorage';
+import { evaluateSmtKpi } from '../utils/kpiCalculator';
 
 interface SmtCardProps {
   smt: SmtRecord;
@@ -30,6 +31,7 @@ interface SmtCardProps {
 }
 
 export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
+  const kpi = evaluateSmtKpi(smt);
   const [coachingData, setCoachingData] = useState<SmtCoachingRecord>(() => 
     getCoachingRecord(smt.nip)
   );
@@ -148,13 +150,10 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
           >
             {smt.nama}
           </h3>
-          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          <div className="flex items-center gap-1.5 mt-1 mb-2.5 flex-wrap">
             <span className="text-[11px] font-extrabold text-purple-700 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-full flex items-center gap-1">
               <Sparkles className="w-3 h-3 text-purple-600" />
               {smt.ytd.genzTag}
-            </span>
-            <span className="text-[11px] font-black text-black bg-[#FFE600] border border-black px-2 py-0.5 rounded-full">
-              Grade {smt.ytd.overallGrade}
             </span>
             {smt.spList && smt.spList.length > 0 && (
               <span className="text-[10px] font-black text-white bg-[#FF3E83] border border-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-[1px_1px_0px_0px_#000]">
@@ -162,6 +161,73 @@ export const SmtCard: React.FC<SmtCardProps> = ({ smt, onOpenDetail }) => {
                 <span>SP ({smt.spList[0].spLabel})</span>
               </span>
             )}
+          </div>
+
+          {/* 🌟 PENILAIAN KPI STANDAR BARU 2026: TULISAN BESAR DI SAMPING GRADE */}
+          <div className="bg-[#FFFDF5] border-2 border-black rounded-2xl p-2.5 shadow-[2px_2px_0px_0px_#000]">
+            <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-black/10">
+              <span className="text-[9px] font-black uppercase tracking-wider text-gray-600 flex items-center gap-1">
+                <span>🎯</span> Standar Penilaian KPI 2026
+              </span>
+              <span className="text-[9px] font-black text-blue-900 bg-blue-100 px-1.5 py-0.2 rounded border border-blue-300">
+                Living World 08
+              </span>
+            </div>
+
+            <div className="flex items-stretch gap-2">
+              {/* GRADE DISPLAY IN BIG FONT */}
+              <div className={`px-2.5 py-1.5 rounded-xl border-2 border-black text-center shrink-0 flex flex-col justify-center shadow-[1px_1px_0px_0px_#000] ${getGradeColor(smt.ytd.overallGrade)}`}>
+                <span className="block text-[8px] font-black uppercase tracking-wider opacity-80 leading-none">GRADE</span>
+                <span className="text-xl sm:text-2xl font-black font-display leading-tight">{smt.ytd.overallGrade}</span>
+              </div>
+
+              {/* 3 KPI ACHIEVEMENTS + HORIZONTAL ACCUMULATION BAR UNDERNEATH */}
+              <div className="flex-1 flex flex-col gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
+                  {/* 1. Store Achievement */}
+                  <div className="bg-white border-2 border-blue-600 rounded-xl p-1 text-center shadow-xs flex flex-col justify-between">
+                    <span className="text-[8px] font-black uppercase text-blue-900 leading-tight">Store Ach.</span>
+                    <span className="text-xs sm:text-sm font-black text-black leading-none my-0.5">103.0%</span>
+                    <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-blue-600 text-white truncate">
+                      Sangat Baik
+                    </span>
+                  </div>
+
+                  {/* 2. Personal Achievement */}
+                  <div className={`bg-white border-2 rounded-xl p-1 text-center shadow-xs flex flex-col justify-between ${kpi.personalTier.borderClass}`}>
+                    <span className="text-[8px] font-black uppercase text-gray-700 leading-tight">Personal</span>
+                    <span className="text-xs sm:text-sm font-black text-black leading-none my-0.5">{kpi.personalPctFormatted}</span>
+                    <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded truncate ${kpi.personalTier.badgeBg} ${kpi.personalTier.badgeText}`}>
+                      {kpi.personalTier.tier}
+                    </span>
+                  </div>
+
+                  {/* 3. Derivative Achievement */}
+                  <div className={`bg-white border-2 rounded-xl p-1 text-center shadow-xs flex flex-col justify-between ${kpi.derivativeTier.borderClass}`}>
+                    <span className="text-[8px] font-black uppercase text-gray-700 leading-tight">Derivatif</span>
+                    <span className="text-xs sm:text-sm font-black text-black leading-none my-0.5">{kpi.derivativePctFormatted}</span>
+                    <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded truncate ${kpi.derivativeTier.badgeBg} ${kpi.derivativeTier.badgeText}`}>
+                      {kpi.derivativeTier.tier}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 🌟 WIDE HORIZONTAL ACCUMULATION BAR UNDERNEATH THE 3 BOXES */}
+                <div className={`bg-white border-2 rounded-xl px-2 py-0.5 flex items-center justify-between gap-1 shadow-xs ${kpi.compositeTier.borderClass}`}>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[8px] font-black uppercase text-gray-600 tracking-tight whitespace-nowrap">
+                      Akumulasi 3 KPI:
+                    </span>
+                    <span className="text-xs font-black text-black leading-none">
+                      {kpi.compositePctFormatted}
+                    </span>
+                  </div>
+                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.2 rounded shrink-0 ${kpi.compositeTier.badgeBg} ${kpi.compositeTier.badgeText}`}>
+                    {kpi.compositeTier.icon} {kpi.compositeTier.tier}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -30,6 +30,7 @@ import { formatCompactRupiah, formatPct, MONTH_CONFIGS } from '../utils/parser';
 import { matchesSmtSearch } from '../utils/searchHelper';
 import { getCoachingRecord, SmtCoachingRecord } from '../utils/coachingStorage';
 import { SmtPdfExportModal } from './SmtPdfExportModal';
+import { evaluateSmtKpi } from '../utils/kpiCalculator';
 
 interface Bottom20ViewProps {
   smtList: SmtRecord[];
@@ -494,6 +495,46 @@ export const Bottom20View: React.FC<Bottom20ViewProps> = ({
                     <p className="text-xs font-semibold text-gray-500 italic mt-0.5 line-clamp-1">
                       "{smt.ytd.genzTagline}"
                     </p>
+
+                    {/* Standar Penilaian KPI 2026 */}
+                    {(() => {
+                      const kpi = evaluateSmtKpi(smt);
+                      return (
+                        <div className="mt-2.5 bg-[#FFFDF5] border border-black/80 rounded-xl p-2 shadow-xs">
+                          <div className="flex items-center justify-between pb-1 mb-1 border-b border-black/10 text-[9px] font-black text-gray-500 uppercase">
+                            <span>🎯 Penilaian KPI 2026</span>
+                            <span className="text-blue-900 font-bold">LW 08</span>
+                          </div>
+                          <div className="flex items-stretch gap-1.5">
+                            <div className="bg-black text-[#FFE600] px-2 py-1 rounded-lg border border-black text-center shrink-0 flex flex-col justify-center">
+                              <span className="text-[7px] font-black uppercase opacity-75">GRADE</span>
+                              <span className="text-sm font-black font-display">{smt.ytd.overallGrade}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 flex-1 text-center">
+                              <div className="bg-white border border-blue-500 rounded-lg p-1">
+                                <span className="text-[7px] font-black uppercase text-blue-900 block leading-tight">Store</span>
+                                <span className="text-[11px] font-black text-black block leading-none">103.0%</span>
+                                <span className="text-[7px] font-black uppercase text-blue-700 block mt-0.5">Sangat Baik</span>
+                              </div>
+                              <div className={`bg-white border rounded-lg p-1 ${kpi.personalTier.borderClass}`}>
+                                <span className="text-[7px] font-black uppercase text-gray-700 block leading-tight">Personal</span>
+                                <span className="text-[11px] font-black text-black block leading-none">{kpi.personalPctFormatted}</span>
+                                <span className={`text-[7px] font-black uppercase block mt-0.5 text-black font-extrabold`}>
+                                  {kpi.personalTier.tier}
+                                </span>
+                              </div>
+                              <div className={`bg-white border rounded-lg p-1 ${kpi.derivativeTier.borderClass}`}>
+                                <span className="text-[7px] font-black uppercase text-gray-700 block leading-tight">Derivatif</span>
+                                <span className="text-[11px] font-black text-black block leading-none">{kpi.derivativePctFormatted}</span>
+                                <span className={`text-[7px] font-black uppercase block mt-0.5 text-black font-extrabold`}>
+                                  {kpi.derivativeTier.tier}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Key Metric Blocks */}

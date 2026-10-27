@@ -73,6 +73,7 @@ import {
   clearCoachingDraft,
   DEFAULT_GDRIVE_URL
 } from '../utils/coachingStorage';
+import { evaluateSmtKpi, STORE_ACHIEVEMENT } from '../utils/kpiCalculator';
 
 interface SmtDetailModalProps {
   smt: SmtRecord | null;
@@ -86,6 +87,8 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
   onNavigate,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [showKpiMatrixGuide, setShowKpiMatrixGuide] = useState(false);
+  const kpi = smt ? evaluateSmtKpi(smt) : null;
   const [coachingData, setCoachingData] = useState<SmtCoachingRecord>(() => 
     smt ? getCoachingRecord(smt.nip) : getDefaultRecord('')
   );
@@ -377,13 +380,22 @@ export const SmtDetailModal: React.FC<SmtDetailModalProps> = ({
 Nama: ${smt.nama} (NIP: ${smt.nip})
 Zona: ${smt.zone}
 Rank Toko: #${smt.ytd.rank}
-Total Sales: ${smt.ytd.rawSales} (${formatPct(smt.ytd.salesPct)} Target)
-Total Polis FP: ${smt.ytd.polisCount} Polis (Rata: ${(smt.ytd.polisCount / (MONTH_CONFIGS.length || 1)).toFixed(1)} Polis/bln)
-Total Clean & Care: ${smt.ytd.rawComser} (Rata: ${formatCompactRupiah(smt.ytd.comserVal / (MONTH_CONFIGS.length || 1))}/bln)
-Bulan Achieve Sales: ${smt.ytd.salesAchCount}/${MONTH_CONFIGS.length} Bulan
-Total Coaching Selesai: ${coachingData.totalCount}x Minggu
-Hasil Evaluasi: ${smt.ytd.evaluationResult}
-Status: Toko Living World Alam Sutera`;
+Grade SMT: *Grade ${smt.ytd.overallGrade}*
+
+🎯 *PENILAIAN KPI STANDAR BARU 2026:*
+• Store Achievement: *103.0%* (${kpi?.storeTier.tier || 'Sangat Baik'})
+• Personal Achievement: *${kpi?.personalPctFormatted || smt.ytd.rawSales}* (${kpi?.personalTier.tier || 'Baik'})
+• Derivatif Achievement: *${kpi?.derivativePctFormatted || '-'}* (${kpi?.derivativeTier.tier || 'Baik'})
+• 📊 *AKUMULASI 3 KPI:* *${kpi?.compositePctFormatted || '-'}* (${kpi?.compositeTier.tier || 'Baik'}) [${kpi?.compositeFormulaText || ''}]
+
+📈 *Detail Capaian YTD:*
+• Total Sales: ${smt.ytd.rawSales} (${formatPct(smt.ytd.salesPct)} Target)
+• Total Polis FP: ${smt.ytd.polisCount} Polis (Rata: ${(smt.ytd.polisCount / (MONTH_CONFIGS.length || 1)).toFixed(1)} Polis/bln)
+• Total Clean & Care: ${smt.ytd.rawComser} (Rata: ${formatCompactRupiah(smt.ytd.comserVal / (MONTH_CONFIGS.length || 1))}/bln)
+• Bulan Achieve Sales: ${smt.ytd.salesAchCount}/${MONTH_CONFIGS.length} Bulan
+• Total Coaching Selesai: ${coachingData.totalCount}x Minggu
+• Hasil Evaluasi: ${smt.ytd.evaluationResult}
+• Status: Toko Living World Alam Sutera (08)`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -552,6 +564,292 @@ Status: Toko Living World Alam Sutera`;
         {/* Scrollable Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6">
           
+          {/* 🌟 STANDAR PENILAIAN KPI SMT 2026 (Store, Personal, Derivatif) - TULISAN BESAR DI SAMPING GRADE */}
+          {kpi && (
+            <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 border-3 border-black rounded-3xl p-5 sm:p-6 bento-shadow relative overflow-hidden">
+              
+              {/* Header Title & Subtitle */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b-2 border-black/15">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-9 h-9 rounded-2xl bg-[#FFE600] border-2 border-black flex items-center justify-center text-lg font-black shadow-[2px_2px_0px_0px_#000]">
+                    🎯
+                  </span>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black font-display text-black uppercase tracking-tight">
+                      Penilaian KPI SMT Standar Baru 2026
+                    </h3>
+                    <p className="text-[11px] font-bold text-gray-600">
+                      Evaluasi Resmi 3 Komponen KPI: Store • Personal Sales • Derivatif Produk
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="bg-blue-100 text-blue-900 border border-blue-400 font-black text-[10px] px-2.5 py-1 rounded-full uppercase">
+                    🏬 Living World 08
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowKpiMatrixGuide(!showKpiMatrixGuide)}
+                    className="text-[11px] font-black bg-white hover:bg-yellow-200 border-2 border-black px-2.5 py-1 rounded-xl shadow-[1px_1px_0px_0px_#000] cursor-pointer flex items-center gap-1 transition-colors"
+                  >
+                    <span>📋 Panduan Tiering</span>
+                    <span className="text-[10px]">{showKpiMatrixGuide ? '▲' : '▼'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Main KPI Row: Big Grade on Left, 3 KPI Cards on Right with LARGE BOLD TEXT */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-stretch">
+                
+                {/* 1. Huge Grade Card */}
+                <div className="md:col-span-3 bg-black text-white border-3 border-black rounded-3xl p-4 sm:p-5 flex flex-col justify-between text-center shadow-[3px_3px_0px_0px_#FFE600] relative overflow-hidden">
+                  <div>
+                    <span className="inline-block bg-[#FFE600] text-black text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-1">
+                      Kualifikasi SMT
+                    </span>
+                    <p className="text-xs text-gray-400 font-bold uppercase mt-1">Overall Grade</p>
+                    <div className="text-5xl sm:text-6xl font-black font-display tracking-tight text-[#FFE600] my-2">
+                      {smt.ytd.overallGrade}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/20">
+                    <span className="text-[10px] font-black text-gray-300 block uppercase">
+                      Rank #{smt.ytd.rank} Toko
+                    </span>
+                    <span className="text-[11px] font-extrabold text-[#06D6A0]">
+                      {smt.ytd.evaluationResult}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Three KPI Assessment Cards in Big Typography + Akumulasi Memanjang di Bawahnya */}
+                <div className="md:col-span-9 flex flex-col gap-3">
+                  
+                  {/* The 3 KPI Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    
+                    {/* KPI 1: STORE ACHIEVEMENT */}
+                    <div className="bg-white border-3 border-blue-600 rounded-3xl p-4 sm:p-4.5 flex flex-col justify-between shadow-[3px_3px_0px_0px_#2563EB]">
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-blue-900 flex items-center gap-1">
+                            <span>🏬</span> Store Ach.
+                          </span>
+                          <span className="text-[9px] font-black bg-blue-100 text-blue-950 px-2 py-0.5 rounded-full border border-blue-300">
+                            Semester 1
+                          </span>
+                        </div>
+
+                        {/* Large Percentage */}
+                        <div className="text-3xl sm:text-4xl font-black font-display text-blue-950 tracking-tight my-1">
+                          {kpi.storePctFormatted}
+                        </div>
+
+                        {/* Large Tier Badge */}
+                        <div className="mt-2">
+                          <span className="inline-block px-3 py-1 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider shadow-sm">
+                            ⭐ {kpi.storeTier.tier}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-2.5 border-t-2 border-blue-100 text-[10px] text-gray-600 font-bold leading-relaxed">
+                        <p>Target: <strong className="text-black">{kpi.storeTargetFormatted}</strong></p>
+                        <p>Realisasi: <strong className="text-blue-900">{kpi.storeAchvFormatted}</strong></p>
+                      </div>
+                    </div>
+
+                    {/* KPI 2: PERSONAL ACHIEVEMENT */}
+                    <div className={`bg-white border-3 rounded-3xl p-4 sm:p-4.5 flex flex-col justify-between shadow-[3px_3px_0px_0px_#000] ${kpi.personalTier.borderClass}`}>
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1">
+                            <span>👤</span> Personal Ach.
+                          </span>
+                          <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full border border-gray-300">
+                            YTD Sales
+                          </span>
+                        </div>
+
+                        {/* Large Percentage */}
+                        <div className="text-3xl sm:text-4xl font-black font-display text-black tracking-tight my-1">
+                          {kpi.personalPctFormatted}
+                        </div>
+
+                        {/* Large Tier Badge */}
+                        <div className="mt-2">
+                          <span className={`inline-block px-3 py-1 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider shadow-sm ${kpi.personalTier.badgeBg} ${kpi.personalTier.badgeText}`}>
+                            {kpi.personalTier.icon} {kpi.personalTier.tier}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-2.5 border-t-2 border-gray-100 text-[10px] text-gray-600 font-bold leading-relaxed">
+                        <p>Capaian Target: <strong className={smt.ytd.salesPct >= 100 ? 'text-emerald-700 font-black' : 'text-red-600 font-black'}>{smt.ytd.salesPct >= 100 ? 'Achieved 100%+' : 'Belum Capai'}</strong></p>
+                        <p>Bulan Achieve: <strong className="text-black">{smt.ytd.salesAchCount}/{MONTH_CONFIGS.length} Bulan</strong></p>
+                      </div>
+                    </div>
+
+                    {/* KPI 3: DERIVATIVE ACHIEVEMENT */}
+                    <div className={`bg-white border-3 rounded-3xl p-4 sm:p-4.5 flex flex-col justify-between shadow-[3px_3px_0px_0px_#000] ${kpi.derivativeTier.borderClass}`}>
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-gray-700 flex items-center gap-1">
+                            <span>🛡️</span> Derivatif Ach.
+                          </span>
+                          <span className="text-[9px] font-black bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full border border-gray-300">
+                            FP & Comser
+                          </span>
+                        </div>
+
+                        {/* Large Percentage */}
+                        <div className="text-3xl sm:text-4xl font-black font-display text-black tracking-tight my-1">
+                          {kpi.derivativePctFormatted}
+                        </div>
+
+                        {/* Large Tier Badge */}
+                        <div className="mt-2">
+                          <span className={`inline-block px-3 py-1 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider shadow-sm ${kpi.derivativeTier.badgeBg} ${kpi.derivativeTier.badgeText}`}>
+                            {kpi.derivativeTier.icon} {kpi.derivativeTier.tier}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-2.5 border-t-2 border-gray-100 text-[10px] text-gray-600 font-bold leading-relaxed">
+                        <p>Furnipro: <strong className="text-indigo-950">{smt.ytd.polisCount} Polis ({kpi.fpPct}%)</strong></p>
+                        <p>Clean & Care: <strong className="text-emerald-950">{formatCompactRupiah(smt.ytd.comserVal)} ({kpi.ccPct}%)</strong></p>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* 🌟 HASIL AKUMULASI 3 PENILAIAN KPI (MEMANJANG DI BAWAH 3 KOTAK TERSEBUT) */}
+                  <div className={`border-3 rounded-3xl p-4 sm:p-5 flex flex-col justify-between gap-3 shadow-[3px_3px_0px_0px_#000] relative overflow-hidden bg-white ${kpi.compositeTier.borderClass}`}>
+                    
+                    {/* Header & Main Info Row */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black text-[#FFE600] font-black text-xs uppercase tracking-wider shadow-xs">
+                            <span>📊</span>
+                            <span>AKUMULASI TOTAL 3 PENILAIAN KPI</span>
+                          </span>
+                          <span className="text-[10px] font-extrabold text-gray-600 bg-gray-100 px-2.5 py-0.5 rounded-lg border border-gray-300">
+                            Store • Personal • Derivatif
+                          </span>
+                        </div>
+
+                        <h4 className="text-sm sm:text-base font-black text-black">
+                          Skor Rata-Rata Kumulatif: <span className="font-mono text-xs sm:text-sm font-extrabold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{kpi.compositeFormulaText}</span>
+                        </h4>
+
+                        <p className="text-[11px] font-bold text-gray-600">
+                          {kpi.compositeTier.description}
+                        </p>
+                      </div>
+
+                      {/* Right Big Bold Score & Large Tier Badge */}
+                      <div className="flex items-center gap-3.5 self-start md:self-auto bg-gradient-to-r from-gray-50 to-amber-50/50 border-2 border-black rounded-2xl p-3 shadow-[2px_2px_0px_0px_#000] shrink-0">
+                        <div className="text-right">
+                          <span className="text-[9px] font-black uppercase text-gray-500 block leading-none mb-0.5">
+                            Hasil Akumulasi
+                          </span>
+                          <span className="text-3xl sm:text-4xl font-black font-display text-black tracking-tight leading-none">
+                            {kpi.compositePctFormatted}
+                          </span>
+                        </div>
+
+                        <div className={`px-3.5 py-2 rounded-xl border-2 border-black text-xs sm:text-sm font-black uppercase tracking-wider shadow-[1px_1px_0px_0px_#000] flex items-center gap-1.5 ${kpi.compositeTier.badgeBg} ${kpi.compositeTier.badgeText}`}>
+                          <span>{kpi.compositeTier.icon}</span>
+                          <span>{kpi.compositeTier.tier}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Visual 5-Tier Scale Progress Meter */}
+                    <div className="pt-2.5 border-t-2 border-black/10">
+                      <div className="flex items-center justify-between text-[10px] font-black uppercase text-gray-600 mb-1">
+                        <span>Peta Posisi Tiering Standar 2026:</span>
+                        <span className="text-black font-black">
+                          Status: <strong className="underline">{kpi.compositeTier.tier}</strong> ({kpi.compositePctFormatted})
+                        </span>
+                      </div>
+
+                      {/* 5-Segment Bar */}
+                      <div className="w-full bg-gray-100 border-2 border-black rounded-full h-3.5 overflow-hidden flex relative shadow-[1px_1px_0px_0px_#000]">
+                        <div style={{ width: '20%' }} className="bg-red-400 border-r border-black/30" title="< 90% Kurang Sekali" />
+                        <div style={{ width: '15%' }} className="bg-amber-400 border-r border-black/30" title="90% <= n < 95% Kurang" />
+                        <div style={{ width: '20%' }} className="bg-[#06D6A0] border-r border-black/30" title="95% <= n <= 100% Baik" />
+                        <div style={{ width: '20%' }} className="bg-blue-500 border-r border-black/30" title="100% < n <= 105% Sangat Baik" />
+                        <div style={{ width: '25%' }} className="bg-emerald-500" title="> 105% Istimewa" />
+                      </div>
+
+                      {/* Bar Labels */}
+                      <div className="flex justify-between text-[8px] sm:text-[9px] font-black text-gray-600 px-1 mt-1 flex-wrap gap-1">
+                        <span className="text-red-700">&lt;90% Kurang Sekali</span>
+                        <span className="text-amber-800">90-95% Kurang</span>
+                        <span className="text-emerald-800">95-100% Baik</span>
+                        <span className="text-blue-800">100-105% Sangat Baik</span>
+                        <span className="text-emerald-900">&gt;105% Istimewa</span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Expandable Official KPI Tiering Matrix Guide (from the user's uploaded guideline image) */}
+              {showKpiMatrixGuide && (
+                <div className="mt-4 pt-4 border-t-2 border-black/15 bg-white/90 rounded-2xl p-4 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="flex items-center justify-between mb-2 pb-1 border-b border-gray-200">
+                    <span className="text-xs font-black uppercase text-black flex items-center gap-1.5">
+                      <span>📊</span> Standar Klasifikasi Tiering KPI Resmi
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-bold">
+                      Berdasarkan Gambar Pedoman Evaluasi Kinerja Toko
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-center text-xs">
+                    <div className="bg-emerald-50 border-2 border-emerald-500 rounded-xl p-2.5">
+                      <span className="text-base">👑</span>
+                      <p className="font-black text-emerald-950 mt-0.5">Istimewa</p>
+                      <p className="text-[11px] font-extrabold text-emerald-700 bg-emerald-100 rounded px-1 mt-1">&gt; 105%</p>
+                    </div>
+
+                    <div className="bg-blue-50 border-2 border-blue-500 rounded-xl p-2.5">
+                      <span className="text-base">🌟</span>
+                      <p className="font-black text-blue-950 mt-0.5">Sangat Baik</p>
+                      <p className="text-[11px] font-extrabold text-blue-700 bg-blue-100 rounded px-1 mt-1">100% &lt; n &le; 105%</p>
+                    </div>
+
+                    <div className="bg-emerald-50 border-2 border-emerald-400 rounded-xl p-2.5">
+                      <span className="text-base">✅</span>
+                      <p className="font-black text-emerald-950 mt-0.5">Baik</p>
+                      <p className="text-[11px] font-extrabold text-emerald-800 bg-emerald-200/60 rounded px-1 mt-1">95% &le; n &le; 100%</p>
+                    </div>
+
+                    <div className="bg-amber-50 border-2 border-amber-500 rounded-xl p-2.5">
+                      <span className="text-base">⚠️</span>
+                      <p className="font-black text-amber-950 mt-0.5">Kurang</p>
+                      <p className="text-[11px] font-extrabold text-amber-800 bg-amber-100 rounded px-1 mt-1">90% &le; n &lt; 95%</p>
+                    </div>
+
+                    <div className="bg-red-50 border-2 border-red-500 rounded-xl p-2.5">
+                      <span className="text-base">🚨</span>
+                      <p className="font-black text-red-950 mt-0.5">Kurang Sekali</p>
+                      <p className="text-[11px] font-extrabold text-red-700 bg-red-100 rounded px-1 mt-1">&lt; 90%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
           {/* Top Hero: Key Performance Metrics */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Sales Total */}

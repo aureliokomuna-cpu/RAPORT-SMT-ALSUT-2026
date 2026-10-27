@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { SmtRecord, MonthKey } from '../types';
 import { SmtCoachingRecord } from '../utils/coachingStorage';
 import { MONTH_CONFIGS, formatPct } from '../utils/parser';
+import { evaluateSmtKpi } from '../utils/kpiCalculator';
 
 export interface PdfExportOptions {
   focusMonth?: 'all' | MonthKey;
@@ -134,6 +135,85 @@ export function generateSmtPdfDocument(
   doc.text(evalText, pageWidth - margin - 25, currY + 10.5, { align: 'center' });
 
   currY += 21;
+
+  // 2.5 Standar Penilaian KPI 2026 (Store, Personal, Derivatif) - Di samping Grade
+  const kpi = evaluateSmtKpi(smt);
+  const kpiSectionHeight = 22;
+  doc.setFillColor(255, 253, 245);
+  doc.roundedRect(margin, currY, contentWidth, kpiSectionHeight, 2, 2, 'F');
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, currY, contentWidth, kpiSectionHeight, 2, 2, 'S');
+
+  // Grade Box on Left
+  doc.setFillColor(0, 0, 0);
+  doc.roundedRect(margin + 2, currY + 2, 24, 18, 1.5, 1.5, 'F');
+  doc.setTextColor(255, 230, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5);
+  doc.text('OVERALL GRADE', margin + 14, currY + 6.5, { align: 'center' });
+  doc.setFontSize(13);
+  doc.text(smt.ytd.overallGrade, margin + 14, currY + 13.5, { align: 'center' });
+  doc.setFontSize(4.5);
+  doc.setTextColor(180, 180, 180);
+  doc.text(`RANK #${smt.ytd.rank}`, margin + 14, currY + 17.2, { align: 'center' });
+
+  // 3 KPI blocks beside Grade
+  const kpiBoxWidth = (contentWidth - 30) / 3;
+  const kpiBoxes = [
+    { title: '1. STORE ACH.', val: '103.0%', tier: kpi.storeTier.tier.toUpperCase(), color: [37, 99, 235] },
+    { title: '2. PERSONAL ACH.', val: kpi.personalPctFormatted, tier: kpi.personalTier.tier.toUpperCase(), color: [16, 130, 60] },
+    { title: '3. DERIVATIF ACH.', val: kpi.derivativePctFormatted, tier: kpi.derivativeTier.tier.toUpperCase(), color: [147, 51, 234] },
+  ];
+
+  kpiBoxes.forEach((box, i) => {
+    const startX = margin + 28 + i * (kpiBoxWidth + 1);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(startX, currY + 2, kpiBoxWidth, 10.5, 1.2, 1.2, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.roundedRect(startX, currY + 2, kpiBoxWidth, 10.5, 1.2, 1.2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.5);
+    doc.setTextColor(90, 90, 90);
+    doc.text(box.title, startX + kpiBoxWidth / 2, currY + 4.8, { align: 'center' });
+
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.text(box.val, startX + kpiBoxWidth / 2, currY + 7.8, { align: 'center' });
+
+    doc.setFillColor(box.color[0], box.color[1], box.color[2]);
+    doc.roundedRect(startX + 1.5, currY + 8.5, kpiBoxWidth - 3, 3, 0.8, 0.8, 'F');
+    doc.setFontSize(4.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text(box.tier, startX + kpiBoxWidth / 2, currY + 10.8, { align: 'center' });
+  });
+
+  // 🌟 Horizontal Akumulasi Bar Underneath the 3 KPI Boxes
+  const accumStartX = margin + 28;
+  const accumWidth = contentWidth - 30;
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(accumStartX, currY + 13.5, accumWidth, 6.5, 1.2, 1.2, 'F');
+  doc.setDrawColor(0, 0, 0);
+  doc.roundedRect(accumStartX, currY + 13.5, accumWidth, 6.5, 1.2, 1.2, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5);
+  doc.setTextColor(50, 50, 50);
+  doc.text('AKUMULASI 3 KPI (STORE + PERSONAL + DERIVATIF):', accumStartX + 2, currY + 17.5);
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(0, 0, 0);
+  doc.text(kpi.compositePctFormatted, accumStartX + 58, currY + 17.7);
+
+  // Composite Tier Badge on Right
+  doc.setFillColor(0, 0, 0);
+  doc.roundedRect(accumStartX + accumWidth - 28, currY + 14.5, 26, 4.5, 1, 1, 'F');
+  doc.setFontSize(5);
+  doc.setTextColor(255, 230, 0);
+  doc.text(kpi.compositeTier.tier.toUpperCase(), accumStartX + accumWidth - 15, currY + 17.5, { align: 'center' });
+
+  currY += kpiSectionHeight + 3;
 
   // 3. 4 KPI Metrics Card Grid
   const cardWidth = (contentWidth - 9) / 4;

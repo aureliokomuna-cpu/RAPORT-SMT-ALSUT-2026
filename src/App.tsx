@@ -124,6 +124,19 @@ export default function App() {
       result = result.filter((s) => {
         const evalStr = s.ytd.evaluationResult;
         switch (filters.selectedStatus) {
+          case 'NEED_ATTENTION':
+            return (
+              evalStr.includes('Warning') ||
+              evalStr.includes('PANTAUAN') ||
+              s.hasActiveSp
+            );
+          case 'TOP_PERFORMER':
+            return (
+              evalStr.includes('Best Performer') ||
+              evalStr.includes('Safe')
+            );
+          case 'WITH_SP':
+            return s.hasActiveSp || (s.spList && s.spList.length > 0);
           case 'BEST':
             return evalStr.includes('Best Performer');
           case 'SAFE':
@@ -173,6 +186,28 @@ export default function App() {
     return result;
   }, [smtList, filters]);
 
+  // Computed counts for FilterBar quick presets
+  const needAttentionCount = useMemo(() => {
+    return smtList.filter(
+      (s) =>
+        s.ytd.evaluationResult.includes('Warning') ||
+        s.ytd.evaluationResult.includes('PANTAUAN') ||
+        s.hasActiveSp
+    ).length;
+  }, [smtList]);
+
+  const topPerformerCount = useMemo(() => {
+    return smtList.filter(
+      (s) =>
+        s.ytd.evaluationResult.includes('Best Performer') ||
+        s.ytd.evaluationResult.includes('Safe')
+    ).length;
+  }, [smtList]);
+
+  const withSpCount = useMemo(() => {
+    return smtList.filter((s) => s.hasActiveSp || (s.spList && s.spList.length > 0)).length;
+  }, [smtList]);
+
   // Modal navigation handler (Next / Prev)
   const handleModalNavigate = (direction: 'next' | 'prev') => {
     if (!selectedSmt) return;
@@ -206,8 +241,8 @@ export default function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         
-        {/* Render View based on active tab */}
-        {filters.activeView === 'bento' && (
+        {/* Render View: Hub 1: Raport & Tim SMT (Bento Cards or Table View with Summary) */}
+        {(filters.activeView === 'bento' || filters.activeView === 'table') && (
           <div>
             {/* Overview Bento Dashboard */}
             <OverviewBento
@@ -225,42 +260,54 @@ export default function App() {
               availableZones={availableZones}
               totalFiltered={filteredSmts.length}
               totalAll={smtList.length}
+              needAttentionCount={needAttentionCount}
+              topPerformerCount={topPerformerCount}
+              withSpCount={withSpCount}
             />
 
-            {/* SMT Bento Cards Grid */}
-            {filteredSmts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                {filteredSmts.map((smt) => (
-                  <SmtCard
-                    key={smt.id}
-                    smt={smt}
-                    onOpenDetail={(s) => setSelectedSmt(s)}
-                  />
-                ))}
-              </div>
+            {/* View Mode: Bento Cards Grid or Table */}
+            {filters.activeView === 'bento' ? (
+              filteredSmts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {filteredSmts.map((smt) => (
+                    <SmtCard
+                      key={smt.id}
+                      smt={smt}
+                      onOpenDetail={(s) => setSelectedSmt(s)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white border-3 border-black rounded-3xl p-10 bento-shadow text-center">
+                  <div className="text-5xl mb-3">🔍</div>
+                  <h3 className="text-xl font-black font-display uppercase">
+                    Tidak Ada SMT Ditemukan
+                  </h3>
+                  <p className="text-xs text-gray-500 font-semibold mt-1">
+                    Coba ubah kata kunci pencarian NIP/Nama atau reset filter status/zona.
+                  </p>
+                  <button
+                    onClick={() =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        searchQuery: '',
+                        selectedZone: 'ALL',
+                        selectedStatus: 'ALL',
+                      }))
+                    }
+                    className="mt-4 px-4 py-2 bg-black text-white rounded-xl text-xs font-black uppercase cursor-pointer"
+                  >
+                    Reset Semua Filter
+                  </button>
+                </div>
+              )
             ) : (
-              <div className="bg-white border-3 border-black rounded-3xl p-10 bento-shadow text-center">
-                <div className="text-5xl mb-3">🔍</div>
-                <h3 className="text-xl font-black font-display uppercase">
-                  Tidak Ada SMT Ditemukan
-                </h3>
-                <p className="text-xs text-gray-500 font-semibold mt-1">
-                  Coba ubah kata kunci pencarian NIP/Nama atau reset filter status/zona.
-                </p>
-                <button
-                  onClick={() =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      searchQuery: '',
-                      selectedZone: 'ALL',
-                      selectedStatus: 'ALL',
-                    }))
-                  }
-                  className="mt-4 px-4 py-2 bg-black text-white rounded-xl text-xs font-black uppercase cursor-pointer"
-                >
-                  Reset Semua Filter
-                </button>
-              </div>
+              <TableView
+                smtList={filteredSmts}
+                onSelectSmt={(smt) => setSelectedSmt(smt)}
+                searchQuery={filters.searchQuery}
+                onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
+              />
             )}
           </div>
         )}
@@ -316,15 +363,6 @@ export default function App() {
                 activeView: 'bento',
               }));
             }}
-          />
-        )}
-
-        {filters.activeView === 'table' && (
-          <TableView
-            smtList={smtList}
-            onSelectSmt={(smt) => setSelectedSmt(smt)}
-            searchQuery={filters.searchQuery}
-            onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
           />
         )}
 

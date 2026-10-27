@@ -35,6 +35,7 @@ import {
 } from '../utils/parser';
 import { SmtCoachingRecord, WEEKS } from '../utils/coachingStorage';
 import { generateSmtPdfDocument } from '../utils/pdfGenerator';
+import { evaluateSmtKpi } from '../utils/kpiCalculator';
 
 interface SmtPdfExportModalProps {
   smt: SmtRecord;
@@ -223,12 +224,20 @@ export const SmtPdfExportModal: React.FC<SmtPdfExportModalProps> = ({
       triggerCelebration();
     }
 
+    const kpi = evaluateSmtKpi(smt);
     const summaryText = `*📄 RAPORT SMT ALSUT 2026 (FILE PDF TERLAMPIR)*
 ━━━━━━━━━━━━━━━━━━━━
 *Nama:* ${smt.nama}
 *NIP:* ${smt.nip}
 *Zona:* ${smt.zone}
-*Peringkat Toko:* #${smt.ytd.rank} dari 150 SMT
+*Peringkat Toko:* #${smt.ytd.rank}
+*Grade SMT:* Grade ${smt.ytd.overallGrade}
+
+🎯 *PENILAIAN KPI STANDAR BARU 2026:*
+• Store Achievement: *103.0%* (${kpi.storeTier.tier})
+• Personal Achievement: *${kpi.personalPctFormatted}* (${kpi.personalTier.tier})
+• Derivatif Achievement: *${kpi.derivativePctFormatted}* (${kpi.derivativeTier.tier})
+• 📊 *AKUMULASI 3 KPI:* *${kpi.compositePctFormatted}* (${kpi.compositeTier.tier}) [${kpi.compositeFormulaText}]
 
 📈 *Capaian YTD:*
 • Total Sales: *${smt.ytd.rawSales}* (${formatPct(smt.ytd.salesPct)} Target)

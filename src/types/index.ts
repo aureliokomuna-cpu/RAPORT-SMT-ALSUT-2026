@@ -104,6 +104,8 @@ export interface ZoneSummary {
 
 export type StatusCategory = 
   | 'ALL'
+  | 'NEED_ATTENTION'
+  | 'TOP_PERFORMER'
   | 'BEST'
   | 'SAFE'
   | 'WARN_DERIVATIVE'
