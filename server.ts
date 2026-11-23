@@ -1,5 +1,5 @@
-import express, { Request, Response } from 'express';
-import { createServer as createViteServer } from 'vite';
+import express from 'express';
+import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -15,8 +15,12 @@ const isProd = process.env.NODE_ENV === 'production';
 const DATA_DIR = path.resolve(__dirname, 'server-data');
 const DATA_FILE = path.join(DATA_DIR, 'coaching_store.json');
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn('[Store] Could not create data directory, using in-memory store:', err);
 }
 
 // In-memory cache for ultra-fast response
@@ -327,6 +331,7 @@ app.delete('/api/coaching/:nip/logs/:logId', (req: Request, res: Response) => {
 async function startServer() {
   if (!isProd && process.env.NODE_ENV !== 'production') {
     // Mount Vite middleware in development
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
